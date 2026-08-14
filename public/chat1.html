@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Socket.IO World Chat Test</title>
+
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    #chat {
+      height: 300px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .msg {
+      margin-bottom: 6px;
+    }
+    input, button {
+      padding: 8px;
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>🌍 Socket.IO World Chat (Test)</h2>
+
+<p id="status">Status: Connecting...</p>
+<p id="online">Online: 0</p>
+
+<div id="chat"></div>
+
+<input id="message" placeholder="Type message..." />
+<button onclick="sendMessage()">Send</button>
+
+<script>
+  /* ================= CONFIG ================= */
+  // const JWT_TOKEN = "PASTE_YOUR_JWT_TOKEN_HERE";
+  const JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OGYwYTc4ZmNiMzRjMzFjN2EzOWMzYyIsImlhdCI6MTc3Mjg2MDk2NCwiZXhwIjoxNzk4NzgwOTY0fQ.4g4a1Ks-zpwQat_PNz4-uM0KTGpkjcHbCAEo4jxLuhQ"
+
+  
+let USER_ID ="698f0a78fcb34c31c7a39c3c"
+  /* ================= SOCKET ================= */
+const socket = io("http://localhost:5000", {
+  path: "/app/server/socket.io",
+  query: { token: JWT_TOKEN },
+  transports: ["websocket"]
+});
+
+
+  /* ================= CONNECTION ================= */
+  socket.on("connect", () => {
+    document.getElementById("status").innerText =
+      "Status: Connected (" + socket.id + ")";
+
+   
+  });
+
+  socket.on("connect_error", (err) => {
+    document.getElementById("status").innerText =
+      "Status: Error - " + err.message;
+  });
+
+  /* ================= SEND MESSAGE ================= */
+  function sendMessage() {
+    const msg = document.getElementById("message").value;
+    if (!msg) return;
+
+    socket.emit("world_message", {
+      senderRoomdata: {
+        senderId: USER_ID,
+        message: msg,
+        screenName: USER_ID,
+        messageType: "text"
+      }
+    });
+
+    document.getElementById("message").value = "";
+  }
+
+  /* ================= RECEIVE MESSAGE ================= */
+  socket.on("world_message", (data) => {
+    const chat = document.getElementById("chat");
+    const div = document.createElement("div");
+    div.className = "msg";
+    div.innerText = `${data.screenName}: ${data.message}`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  });
+   socket.on("connected", (data) => {
+            console.log("Welcome message:", data);
+        });
+
+socket.emit("send_message", {
+  sender_id: "698f0a78fcb34c31c7a39c3c",
+  sender_name: "mousam",
+  sender_image: "tes",
+
+  receiver_id: "69abbd5856da9310db0aef4b",
+  receiver_name: "rohit",
+  receiver_image: "test",
+
+  conversation_id: null,
+  receiver_model: "User",
+  sender_model: "User",
+
+  message: "Hello, how are you?",
+  type: "message",
+  files: [],
+
+  is_event: true,
+  approve_event: false,
+  reject_event: false,
+
+  event_object: {
+   
+  }
+});
+
+   socket.emit("join_chat", {
+   user_id: "698f0a78fcb34c31c7a39c3c",
+   conversation_id: "",
+   });
+
+
+        socket.on('receive_message',(data)=>{
+    console.log('--------receive_message',data);
+ })
+  //  socket.emit("event_update", {
+  //  user_id: "6989a737aa6a99716a998c54",
+  //  message_id: "69aa697cfec6e77614793d65",
+  //  is_approve:true
+  //  });
+
+  //     socket.on('event_update',(data)=>{
+  //   console.log('-------event_update',data);
+  //   })
+  //     socket.emit("leave_chat", {
+  //  user_id: "69787dc13c883e5532743304",
+  //  conversation_id: "69957f770587fa2129fe8a9c",
+  //  });
+
+  //  socket.emit('user_status', {
+  //  user_id: "699fddb5d9b553d9779873b4",
+  //  check_user_id:"68edf168efc853010224a2f6",
+   
+  //  });
+  //   socket.on('user_status',(data)=>{
+  //   console.log('--------online user',data);
+  //   })
+
+//     socket.emit("get_message_list", {
+//    user_id: "69787dc13c883e5532743304",
+//    page:1,
+//    limit:50,
+//    conversation_id: "69957f770587fa2129fe8a9c",
+// });
+
+//     socket.emit("get_conversation_list", {
+//   user_id: "69787dc13c883e5532743304",
+//   page:1,
+//   limit:50,
+
+// });
+        socket.on('get_message_list',(data)=>{
+   console.log('--------get_message_list',data);
+    })
+    
+        socket.on('get_conversation_list',(data)=>{
+   console.log('--------get_conversation_list',data);
+    })
+
+   socket.on('send_message',(data)=>{
+console.log('--------send_message',data);
+ })
+    socket.on('receive_message',(data)=>{
+console.log('--------receive_message',data);
+ })
+
+   socket.on('last_conversation',(data)=>{
+console.log('--------last_conversation message',data);
+ })
+  /* ================= ONLINE COUNT ================= */
+  socket.on("world_online_count", (count) => {
+    document.getElementById("online").innerText =
+      "Online: " + count;
+  });
+
+  /* ================= DEBUG ================= */
+  socket.onAny((event, data) => {
+    console.log("EVENT:", event, data);
+  });
+</script>
+
+</body>
+</html>

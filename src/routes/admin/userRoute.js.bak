@@ -1,0 +1,21 @@
+import express from 'express';
+import userController from '../../controller/admin/userController.js';
+import { allowAdminOrVendor } from '../../middleware/authMiddleware.js';
+import multer from 'multer';
+import upload from "../../config/multer_config.js";
+const route = express.Router();
+
+route
+    .get("/get_all_user", allowAdminOrVendor, userController.getAllUsers)
+    .get("/get_user_by_id/:id", allowAdminOrVendor, userController.getUserById)
+    .post("/change_Status/:id", allowAdminOrVendor, userController.updateUserStatus)
+    .get("/get_delete_user", allowAdminOrVendor, userController.getDeletedUsers);
+route.get('/get_user_details/:id', allowAdminOrVendor, userController.getUserDetails);
+route.post('/image_uplod', upload.array('image'), userController.imageUpload)
+// Get only user bookings
+route.get('/get_user_bookings/:id', allowAdminOrVendor, userController.getUserBookings)
+
+    .get("/get_all_user_reports", userController.getUserReports)
+    .post("/update_report_status", userController.updateUserReportStatus)
+
+export default route;

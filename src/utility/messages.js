@@ -1,0 +1,355 @@
+/** @format */
+
+// utils/messages.js
+export default {
+  // 🔐 Auth
+  ADMIN_NOT_FOUND: ["Admin not found for given email."],
+  FORGET_PASSWORD_MAIL_SUCCESSFULLY: [
+    "Forget password email sent successfully.",
+  ],
+  FORGET_MAILED_FAILED: ["Failed to send forget password email."],
+  REQUIRED: ["Required"],
+  NOT_FOUND: ["User not found"],
+  WRONG_PASS: ["Entered email address or password is not correct, please try again."],
+  ALREADY_EXIST: ["Already exists"],
+  SERVER_ERROR: ["Server error"],
+  INVALID_EMAIL: ["Invalid email format"],
+  PASSWORD_MIN: ["Password minimum length not met"],
+  PASSWORD_MISMATCH: ["Password does not match"],
+  PROFILE_UPDATED: ["Profile updated successfully"],
+  PASSWORD_CHANGED: ["Password changed successfully"],
+  SUCCESS: ["Successfully completed"],
+  VALIDATION_ERROR: ["Validation error"],
+  TOKEN_INVALID: ["Invalid authentication token. Please log in again."],
+  TOKEN_MISSING: ["Authentication token is missing. Access denied."],
+  FORBIDDEN: ["You do not have permission to access this resource."],
+  UNAUTHORIZED: ["Unauthorized access"],
+  BAD_REQUEST: ["Bad request"],
+  DATA_ADDED: ["Details added successfully"],
+  MUSIC_GENRE_REQ: ["Select at least 1 and max 5 music genres"],
+  PREFFERENCE_REQ: ["At least one event preference is required"],
+  VIBE_REQ: ["At least one vibe is required"],
+  SEXUALITY_INTEREST_REQ: ["Sexuality and interested in are required"],
+  PRONOUNS_REQ: ["Pronouns are required"],
+  GALARY_LENGTH: ["Maximum 8 images allowed"],
+  VIBE_VALIDATE: ["Maximum 3 vibe checks allowed"],
+  MSG_USERNAME_EXISTS: ["Username is required"],
+  USERNAME_ALREDY_EXISTS: ["Username already exists"],
+  SIGNUP_SUCCESS: ["User register successfully"],
+  OTP_EXPIRED: ["Otp expired!"],
+  NEW_PASSWORD_SAME_AS_OLD: ["New password can not be same as old / current password"],
+  SWIPE_LEFT: ["Swiped left"],
+  SWIPE_RIGHT: ["Swiped right"],
+  ITS_MATCH: ["It's a match"],
+  INTEREST_MUST_ARRAY: ["Interests must be an array"],
+  TOGGLE_KEYS_REQ: ["Only age , height , pronouns ,location, hobbies, vibes, recent_events, recent_venues, instagram, spotify are allowed"],
+  MEDIA_URL_REQ: ["Media url is required"],
+  ONLY_BOOLEAN: ["Only true or false required"],
+  MEDIA_NOT_FOUND: ["Media not found"],
+  MEDIA_UPLOADED_SUCCESS: ["Gallery uploaded successfully"],
+  HOBBIES_UPDATE_SUCCESS: ["Hobbies updated successfully"],
+  VENUES_EVENTS_TYPE_REQ: ["Type must be event or venue"],
+  SOCIAL_ACCOUNT_UPDATED: ["Social account updated successfully"],
+  TICKET_SOLDOUT: ["Tickets have sold out for this event."],
+  COUPON_EXPIRED: ["This coupon code has expired."],
+  BOOKING_SUCCESS: ["Event joined successfully"],
+  PROFILE_REQ: ["Please upload profile image"],
+  AGE_RESTRICTION: ["You must be at least 18 years old to sign up"],
+  INVALID_DOB: ["Please enter a valid date of birth"],
+  VENUE_BOOKED_SUCCESS: ["Venue booking successfully"],
+  INVALID_SLOTS: ["Invalid slot selected"],
+  BLOCKED_SUCESS: ["User blocked successfully"],
+  UNBLOCKED_SUCESS: ["User unblocked successfully"],
+  VENUE_FOLLOWED_SUCCESS: ["Venue followed successfully"],
+  VENUE_UNFOLLOWED_SUCCESS: ["Venue unfollowed successfully"],
+  MSG_INVALID_OLD_PASSWORD: ["Old password is incorrect."],
+  MSG_PASSWORD_SAME: ["New password cannot be the same as old password"],
+  MSG_PASSWORD_UPDATED: ["Password updated successfully"],
+  USER_ACTIVATE: ["User activated successfully"],
+  USER_DEACTIVATE: ["User deactivated successfully"],
+  CATEGORY_ALREADY: ["Category already exists"],
+  STATE_ALREADY: ["State already exists"],
+  CITY_ALREADY: ["City already exists"],
+  INTEREST_ALREADY: ["Interest already exists"],
+  BOOKINGID_REQ: ["Booking Id is required"],
+  BOOKING_NOT_FOUND: ["Booking not found"],
+  BOOKINGID_RATING_REQ: ["Booking ID and rating are required"],
+  RATING_LENGTH: ["Rating must be between 1 and 5"],
+  GENRE_CREATED_SUCCESSFULLY: ["Genre created successfully"],
+  GENRE_UPDATED_SUCCESSFULLY: ["Genre updated successfully"],
+  FAQ_ALREADY: ["Question is already exists"],
+  COMMISSION_NOT_VALID: ["Commission percentage must be between 0 and 100"],
+  COMMISSION_REQ: ["Please enter commission percentage"],
+  FRIENDSHIP_REMOVED: ["Unfriend successfully"],
+  USER_REPORTED_SUCCESS: ["User reported successfully"],
+
+
+  // 📝 Blog
+  BLOG_CREATED: ["Blog created successfully"],
+  BLOG_UPDATED: ["Blog updated successfully"],
+  BLOG_DELETED: ["Blog deleted successfully"],
+  BLOG_NOT_FOUND: ["Blog not found"],
+
+  // 👤 User
+  USER_CREATED: ["User created successfully"],
+  USER_UPDATED: ["User updated successfully"],
+  USER_DELETED: ["User deleted successfully"],
+  USER_NOT_FOUND: ["User not found"],
+  USER_LIST_FETCHED: ["Users fetched successfully"],
+  USER_ACTIVATED: ["User activated successfully"],
+  USER_DEACTIVATED: ["User deactivated successfully"],
+  DELETED_USERS_FETCHED: ["Deleted users fetched successfully"],
+
+  BOOKING_CREATED: ["Booking created successfully"],
+  BOOKING_FETCHED: ["Booking details fetched successfully"],
+  BOOKING_UPDATED: ["Booking updated successfully"],
+  BOOKING_CANCELED: ["Booking canceled successfully"],
+  BOOKING_COMPLETED: ["Booking completed successfully"],
+  BOOKING_NOT_FOUND: ["Booking not found"],
+  BOOKING_DELETED: ["Booking deleted successfully"],
+  BOOKING_STATS_FETCHED: ["Booking statistics fetched successfully"],
+  EVENT_BOOKINGS_FETCHED: ["Event bookings fetched successfully"],
+  VENUE_BOOKINGS_FETCHED: ["Venue bookings fetched successfully"],
+  BOOKING_WITH_EARNING_CREATED: ["Booking created successfully with earning record"],
+
+  // Booking Validation Messages
+  BOOKING_REQUIRED_FIELDS: ["All required fields must be provided"],
+  BOOKING_TYPE_REQUIRED: ["Booking type must be either 'event' or 'venue'"],
+  BOOKING_EVENT_ID_REQUIRED: ["Event ID is required for event bookings"],
+  BOOKING_VENUE_ID_REQUIRED: ["Venue ID is required for venue bookings"],
+  BOOKING_EVENT_OR_VENUE_REQUIRED: ["Either event_id or venue_id must be provided, or specify booking_type"],
+  BOOKING_CONTACT_INFO_REQUIRED: ["Complete contact information is required"],
+  BOOKING_USER_NOT_FOUND: ["User not found"],
+  BOOKING_EVENT_NOT_FOUND: ["Event not found or does not belong to vendor"],
+  BOOKING_VENUE_NOT_FOUND: ["Venue not found or does not belong to vendor"],
+  BOOKING_TICKET_NOT_FOUND: ["Ticket not found or does not belong to vendor"],
+
+  // 📢 Broadcast
+  BROADCAST_SENT_SUCCESSFULLY: ["Broadcast sent successfully"],
+
+  // 🔔 Notifications
+  NOTIFICATION_SENT: ["Notification sent successfully"],
+  NOTIFICATION_FETCHED: ["Notifications fetched successfully"],
+  NOTIFICATION_NOT_FOUND: ["Notification not found"],
+  NOTIFICATION_DELETED: ["Notification deleted successfully"],
+  ALL_NOTIFICATIONS_DELETED: ["All notifications deleted successfully"],
+  NOTIFICATION_STATUS_UPDATED: ["Notification status updated successfully"],
+  NO_NOTIFICATION_FOUND: ["No notification found"],
+
+  // 💳 Card Details
+  CARD_ADDED: ["Card added successfully"],
+  CARD_UPDATED: ["Card updated successfully"],
+  CARD_DELETED: ["Card deleted successfully"],
+  CARD_NOT_FOUND: ["Card not found"],
+
+  // 📝 User Submit Answer
+  ANSWER_SUBMITTED: ["Answer submitted successfully"],
+  ANSWER_UPDATED: ["Answer updated successfully"],
+  ANSWER_FETCHED: ["Answer fetched successfully"],
+  ANSWER_NOT_FOUND: ["Answer not found"],
+
+  // 🎟️ Coupon
+  COUPON_CREATED: ["Coupon created successfully"],
+  COUPON_UPDATED: ["Coupon updated successfully"],
+  COUPON_DELETED: ["Coupon deleted successfully"],
+  COUPON_INVALID: ["Coupon is invalid"],
+  COUPON_EXPIRED: ["Coupon has expired"],
+  COUPON_NOT_FOUND: ["Coupon not found"],
+  COUPON_ALREADY_EXISTS: ["Coupon already exists"],
+
+  // ❓ FAQ
+  FAQ_CREATED: ["FAQ created successfully"],
+  FAQ_UPDATED: ["FAQ updated successfully"],
+  FAQ_DELETED: ["FAQ deleted successfully"],
+  FAQ_NOT_FOUND: ["FAQ not found"],
+  FAQ_REQUIRED: ["Question and answer are required"],
+  FAQ_ALREADY_EXISTS: ["FAQ already exists"],
+
+  // 📄 Content
+  CONTENT_CREATED: ["Content created successfully"],
+  CONTENT_UPDATED: ["Content updated successfully"],
+  CONTENT_DELETED: ["Content deleted successfully"],
+  CONTENT_NOT_FOUND: ["Content not found"],
+  CONTENT_TYPE_REQUIRED: ["Content type is required"],
+
+  // 📞 Contact
+  CONTACT_RECEIVED: ["Contact received successfully"],
+  CONTACT_RESPONDED: ["Contact responded successfully"],
+  CONTACT_REPLIED: ["Contact replied successfully"],
+  CONTACT_LIST_FETCHED: ["Contact list fetched successfully"],
+  CONTACT_NOT_FOUND: ["Contact not found"],
+
+  // 🌐 State
+  STATE_CREATED: ["State added successfully"],
+  STATE_UPDATED: ["State updated successfully"],
+  STATE_DELETED: ["State deleted successfully"],
+  STATE_NOT_FOUND: ["State not found"],
+  STATE_ALREADY_EXISTS: ["State already exists"],
+
+  // 🏙️ City
+  CITY_CREATED: ["City added successfully"],
+  CITY_UPDATED: ["City updated successfully"],
+  CITY_DELETED: ["City deleted successfully"],
+  CITY_NOT_FOUND: ["City not found"],
+  CITY_ALREADY_EXISTS: ["City already exists"],
+
+  // ❤️ Interest
+  INTEREST_CREATED: ["Interest added successfully"],
+  INTEREST_UPDATED: ["Interest updated successfully"],
+  INTEREST_DELETED: ["Interest deleted successfully"],
+  INTEREST_NOT_FOUND: ["Interest not found"],
+  INTEREST_ALREADY_EXISTS: ["Interest already exists"],
+
+  // 📑 Category
+  CATEGORY_CREATED: ["Category added successfully"],
+  CATEGORY_UPDATED: ["Category updated successfully"],
+  CATEGORY_DELETED: ["Category deleted successfully"],
+  CATEGORY_NOT_FOUND: ["Category not found"],
+  CATEGORY_ALREADY_EXISTS: ["Category already exists"],
+  CATEGORY_REQUIRED: ["Category is required"],
+
+  // 🎵 Genre
+  GENRE_CREATED: ["Genre created successfully"],
+  GENRE_UPDATED: ["Genre updated successfully"],
+  GENRE_DELETED: ["Genre deleted successfully"],
+  GENRE_NOT_FOUND: ["Genre not found"],
+  GENRE_ALREADY_EXISTS: ["Genre already exists"],
+
+  // 🌟 Vibe
+  VIBE_CREATED: ["Vibe added successfully"],
+  VIBE_UPDATED: ["Vibe updated successfully"],
+  VIBE_DELETED: ["Vibe deleted successfully"],
+  VIBE_NOT_FOUND: ["Vibe not found"],
+  VIBE_ALREADY_EXISTS: ["Vibe already exists"],
+  VIBECHECK_ALREADY: ["Vibe Check already exists"],
+  VIBECHECK_CREATED: ["Vibe check created successfully"],
+
+  // 🎫 Ticket
+  TICKET_CREATED: ["Ticket created successfully"],
+  TICKET_UPDATED: ["Ticket updated successfully"],
+  TICKET_DELETED: ["Ticket deleted successfully"],
+  TICKET_NOT_FOUND: ["Ticket not found"],
+  INVALID_EVENT_ID: ["Invalid event ID"],
+  NO_TICKETS_FOUND: ["No tickets found for this event"],
+
+  // 🎉 Event
+  EVENT_CREATED: ["Event created successfully"],
+  EVENT_UPDATED: ["Event updated successfully"],
+  EVENT_DELETED: ["Event deleted successfully"],
+  EVENT_NOT_FOUND: ["Event not found"],
+  EVENT_FIELDS_REQUIRED: ["All event fields are required"],
+
+  // 🎯 Amenity
+  AMENITY_CREATED: ["Amenity created successfully"],
+  AMENITY_UPDATED: ["Amenity updated successfully"],
+  AMENITY_DELETED: ["Amenity deleted successfully"],
+  AMENITY_NOT_FOUND: ["Amenity not found"],
+
+  // 💼 Vendor
+  VENDOR_CREATED: ["Vendor created successfully"],
+  VENDOR_UPDATED: ["Vendor updated successfully"],
+  VENDOR_DELETED: ["Vendor deleted successfully"],
+  VENDOR_RESTORED: ["Vendor restored successfully"],
+  VENDOR_ACTIVATED: ["Vendor activated successfully"],
+  VENDOR_DEACTIVATED: ["Vendor deactivated successfully"],
+  VENDOR_LIST_FETCHED: ["Vendors fetched successfully"],
+  VENDOR_NOT_FOUND: ["Vendor not found"],
+  VENDOR_ALREADY_EXISTS: ["Vendor already exists"],
+  BUSINESS_NAME_REQUIRED: ["Business name is required"],
+  OWNER_NAME_REQUIRED: ["Owner name is required"],
+  EMAIL_REQUIRED: ["Email is required"],
+  PHONE_NUMBER_REQUIRED: ["Phone number is required"],
+  PASSWORD_REQUIRED: ["Password is required"],
+  BUSINESS_NAME_TOO_SHORT: ["Business name is too short"],
+  BUSINESS_NAME_TOO_LONG: ["Business name is too long"],
+  OWNER_NAME_TOO_SHORT: ["Owner name is too short"],
+  OWNER_NAME_TOO_LONG: ["Owner name is too long"],
+  INVALID_PHONE_NUMBER: ["Invalid phone number"],
+  INVALID_CATEGORY_ID: ["Invalid category"],
+  INVALID_VENDOR_ID: ["Invalid vendor ID"],
+  PASSWORD_TOO_SHORT: ["Password is too short"],
+
+  // 💰 Earnings
+  EARNING_ADDED: ["Earning added successfully"],
+  EARNING_LIST_FETCHED: ["Earnings fetched successfully"],
+  TODAY_EARNING_FETCHED: ["Today's earnings fetched successfully"],
+
+  // 💸 Withdrawals
+  WITHDRAWAL_REQUESTED: ["Withdrawal request submitted"],
+  WITHDRAWAL_LIST_FETCHED: ["Withdrawal requests fetched successfully"],
+  WITHDRAWAL_APPROVED: ["Withdrawal approved successfully"],
+  WITHDRAWAL_REJECTED: ["Withdrawal rejected successfully"],
+
+  // 🔧 Service
+  SERVICE_CREATED: ["Service created successfully"],
+  SERVICE_UPDATED: ["Service updated successfully"],
+  SERVICE_DELETED: ["Service deleted successfully"],
+  SERVICE_NOT_FOUND: ["Service not found"],
+
+  // 🔄 Common
+  ALL_FIELDS_REQUIRED: ["All fields are required"],
+  DATA_FOUND: ["Data found successfully"],
+  NO_DATA_FOUND: ["No data found"],
+  OPERATION_SUCCESSFUL: ["Operation completed successfully"],
+
+  // 📱 OTP & Account
+  MSG_EMPTY_PARAM: ["Please provide required data"],
+  MSG_EMAIL_PHONE_EXISTS: ["Email already in use"],
+  MSG_PHONE_EXISTS: ["Mobile number already in use"],
+  MSG_OTP_SENT: ["OTP sent successfully"],
+  ACCOUNT_DEACTIVATED: ["Your account has been deactivated by admin"],
+  ACCOUNT_DELETED: ["Your account has been deleted successfully"],
+  WRONG_OTP: ["Wrong or invalid OTP"],
+  OTP_VERIFIED: ["OTP verified successfully"],
+  NEW_PASSWORD_CREATED: ["Password reset successfully"],
+  INVALID_PASSWORD: ["Invalid password"],
+  LOGIN_SUCCESSFUL: ["Login successful"],
+  NOT_REGISTERED: ["You are not registered"],
+  OLD_PASSWORD_INCORRECT: ["Current password is incorrect"],
+  SAME_PASSWORD: ["New password cannot be same as current password"],
+  TWO_FA_ENABLED: ["Two-factor authentication enabled successfully"],
+  SEARCH_TEXT_REQUIRED: ["Search text is required"],
+  INVALID_CREDENTIALS: ["Invalid credentials provided"],
+  ACCOUNT_DEACTIVATE_BY_ADMIN: ["Your account has been deactivated by admin"],
+  MOBILE_NUMBER_CHECK: ["Mobile number is already register with us"],
+
+  // Vendor messages
+  VENDOR_NOT_FOUND: "Vendor not found",
+  VENDOR_LOGIN_SUCCESS: "Vendor login successful",
+  VENDOR_PROFILE_UPDATED: "Vendor profile updated successfully",
+  ACCOUNT_DEACTIVATED: "Your account has been deactivated",
+  EMAIL_ALREADY_EXISTS: "Email already exists",
+
+  // In your messages.js file
+  EMAIL_ALREADY_EXISTS: "Email already exists",
+  EMAIL_REQUIRED: "Email is required",
+  INVALID_EMAIL: "Please enter a valid email address",
+
+  COMMISSION_SET_SUCCESS: ["Commission settings updated successfully"],
+  COMMISSION_BULK_SET_SUCCESS: ["Bulk commissions set successfully"],
+  COMMISSION_FETCHED: ["Commissions fetched successfully"],
+  COMMISSION_STATS_FETCHED: ["Commission statistics fetched successfully"],
+  COMMISSION_DELETED: ["Commission setting deleted successfully"],
+  COMMISSION_NOT_FOUND: ["Commission setting not found"],
+  COMMISSION_INVALID_PERCENT: ["Commission percentage must be between 0 and 100"],
+  COMMISSION_EVENT_IDS_REQUIRED: ["Event IDs are required for event commission or set apply_to_all=true"],
+  COMMISSION_VENUE_IDS_REQUIRED: ["Venue IDs are required for venue commission or set apply_to_all=true"],
+  COMMISSION_GLOBAL_INVALID_FIELDS: ["Global commission should not have event_ids, venue_ids, or apply_to_all"],
+  COMMISSION_EVENT_ID_REQUIRED: ["Event ID is required for event commission"],
+  COMMISSION_VENUE_ID_REQUIRED: ["Venue ID is required for venue commission"],
+  COMMISSION_ARRAY_REQUIRED: ["Commissions array is required"],
+  COMMISSION_UPDATED: ["Commission updated successfully"],
+
+  // App Msgs
+  PROFILE_SWIPER_SUCCESS: ["Profile visibility updated successfully"],
+  REPORT_REASON_SENT: ["Report sent successfully"],
+
+  // Ads
+  ADS_REQ:["Ad image is required"],
+  EXPIRYDATE_REQ:["Expire date is required"],
+  ADS_CREATED:["Ad created successfully"],
+  ADS_NOT_FOUND:["Ad not found"],
+  ADS_FOUND:["Ad found successfully"],
+  ADS_UPDATED:["Ad updated successfully"],
+  ADS_DELETED:["Ad updated successfully"],
+};

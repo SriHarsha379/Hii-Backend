@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Chat Client</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #status { color: #666; margin-bottom: 10px; }
+        #messages { list-style: none; padding: 0; }
+        #messages li { padding: 5px 10px; margin-bottom: 5px; background: #f0f0f0; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Socket.IO Chat Client</h1>
+    <div id="status">Status: Disconnected</div>
+    
+    <form id="messageForm">
+        <input type="text" id="messageInput" placeholder="Type a message..." style="width: 300px;">
+        <button type="submit">Send</button>
+    </form>
+    
+    <ul id="messages"></ul>
+
+    <!-- Load Socket.IO client library -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <script>
+         const JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5YWJiZDU4NTZkYTkzMTBkYjBhZWY0YiIsImlhdCI6MTc3Mjg2MzAzMSwiZXhwIjoxNzk4NzgzMDMxfQ.gYqmrODcOr_dV8Jlnl4fHERj2a2n5-evydx2nHx6JVw"
+        // Initialize Socket.IO client
+//         const socket = io("https://hii.life", {
+//           path: "/app/server/socket.io",
+//   query: { token: JWT_TOKEN },
+//   transports: ["websocket"]
+//         });
+        const socket = io("http://localhost:5000", {
+          path: "/app/server/socket.io",
+  query: { token: JWT_TOKEN },
+  transports: ["websocket"]
+        });
+
+        // Connection event handlers
+        socket.on("connect", (data) => {
+            document.getElementById("status").innerText = 
+                `Status: Connected (ID: ${socket.id})`;
+            console.log("Connected to server with ID:", socket.id);
+        });
+
+
+        socket.on("disconnect", (reason) => {
+            document.getElementById("status").innerText = 
+                `Status: Disconnected (${reason})`;
+            console.log("Disconnected:", reason);
+        });
+
+
+        socket.on("connect_error", (error) => {
+            document.getElementById("status").innerText = 
+                `Status: Connection Error - ${error.message}`;
+            console.error("Connection error:", error);
+        });
+
+        socket.on("reconnect", (attemptNumber) => {
+            document.getElementById("status").innerText = 
+                `Status: Reconnected after ${attemptNumber} attempts`;
+            console.log("Reconnected after", attemptNumber, "attempts");
+        });
+
+
+        // Message form submission
+        document.getElementById("messageForm").addEventListener("submit", (e) => {
+            e.preventDefault();
+            
+            const input = document.getElementById("messageInput");
+            const message = input.value.trim();
+            
+            if (message && socket.connected) {
+                // Send message to server
+                socket.emit("chat message", message);
+                input.value = "";
+            }
+        });
+
+
+
+        // Listen for messages from server
+        socket.on("chat message", (msg) => {
+            const messages = document.getElementById("messages");
+            const li = document.createElement("li");
+            li.textContent = msg;
+            messages.appendChild(li);
+        });
+
+           socket.on("connected", (data) => {
+            console.log("Welcome message:", data);
+           }); 
+
+           socket.on('receive_message',(data)=>{
+    console.log('--------receive_message',data);
+ })
+// socket.emit("send_message", {
+//   sender_id: "69abbd5856da9310db0aef4b",
+//   sender_name: "mousam",
+//   sender_image: "tes",
+
+//   receiver_id: "698f0a78fcb34c31c7a39c3c",
+//   receiver_name: "rohit",
+//   receiver_image: "test",
+
+//   conversation_id: null,
+//   receiver_model: "User",
+//   sender_model: "User",
+
+//   message: "Hello, how are you?",
+//   type: "message",
+//   files: [],
+
+//   is_event: true,
+//   approve_event: false,
+//   reject_event: false,
+
+//   event_object: {
+   
+//   }
+// });
+
+ //699fddb5d9b553d9779873b4
+ socket.emit("join_chat", {
+  user_id: "69abbd5856da9310db0aef4b",
+  conversation_id: "69abd068d0de3ce66a6c0ac9",
+});
+
+   socket.on('last_conversation',(data)=>{
+console.log('--------last_conversation message',data);
+ })
+
+//  socket.emit("join_chat", {
+//   user_id: "68edf168efc853010224a2f6",
+//   conversation_id: "69957f770587fa2129fe8a9c",
+// });
+
+   socket.emit('user_status', {
+   user_id: "68edf168efc853010224a2f6",
+   check_user_id:"69787dc13c883e5532743304",
+   
+   });
+    socket.on('user_status',(data)=>{
+    console.log('--------online user',data);
+    })
+
+        // Example: Listen for custom events from your configureSocket function
+           socket.on("welcome", (data) => {
+            console.log("Welcome message:", data);
+         });
+    </script>
+</body>
+</html>
