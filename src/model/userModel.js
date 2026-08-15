@@ -205,6 +205,8 @@ const UserSchema = new mongoose.Schema(
     accepted_privacy_policy: { type: Boolean, default: false },
 
     is_active: { type: Boolean, default: true },
+    is_banned: { type: Boolean, default: false },
+    ban_reason: { type: String, default: null },
     is_deleted: { type: Boolean, default: false },
     my_visibility: { type: Boolean, default: true },
 

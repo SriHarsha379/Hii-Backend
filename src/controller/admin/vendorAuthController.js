@@ -39,6 +39,16 @@ const vendorAuthController = {
         });
       }
 
+      // New organiser signups need Super Admin approval before they can
+      // access their dashboard — see the "Organiser Requests" review queue.
+      if (!vendor.is_verified) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account is pending admin approval. You'll be notified once it's reviewed.",
+          pending_approval: true,
+        });
+      }
+
       const token = jwt.sign(
         { vendorId: vendor._id },
         process.env.JWT_SECRET,

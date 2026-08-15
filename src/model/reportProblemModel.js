@@ -34,7 +34,7 @@ const ReportProblemSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Pending", "Inprogress", "Resolve"],
+      enum: ["Pending", "Inprogress", "Resolve", "Closed"],
       default: "Pending"
     },
 

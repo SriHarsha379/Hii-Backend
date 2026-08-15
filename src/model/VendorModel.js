@@ -104,7 +104,16 @@ const VendorSchema = new mongoose.Schema(
 
     is_verified: {
       type: Boolean,
-      default: true,
+      // New organiser signups now require Super Admin approval before they
+      // can log in — see the "Organiser Requests" review queue. Existing
+      // vendors already in the DB keep whatever value they had; this only
+      // changes the default for new documents.
+      default: false,
+    },
+
+    rejection_reason: {
+      type: String,
+      default: null,
     },
 
     is_active: {

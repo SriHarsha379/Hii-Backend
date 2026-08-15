@@ -1,12 +1,14 @@
 import { Ads } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import logActivity from "../../utility/activityLogger.js";
 
 /* ================= CREATE AD ================= */
 const createAd = async (req, res) => {
     try {
-        const { expiry_date } = req.body;
-        const ad_image = req.file?.filename;
+        const { expiry_date, link_url } = req.body;
+        const ad_image = req.files?.ad_image?.[0]?.filename;
+        const ad_video = req.files?.ad_video?.[0]?.filename;
 
         if (!expiry_date) {
             return apiResponse.badRequest(res, messages.EXPIRYDATE_REQ);
@@ -16,12 +18,20 @@ const createAd = async (req, res) => {
             return apiResponse.badRequest(res, messages.ADS_REQ);
         }
 
+        if (link_url && !/^https?:\/\/.+/i.test(link_url)) {
+            return apiResponse.badRequest(res, messages.INVALID_AD_LINK);
+        }
+
         const ad = new Ads({
             ad_image,
+            ad_video: ad_video || null,
+            link_url: link_url || null,
             expiry_date: expiry_date || null
         });
 
         await ad.save();
+
+        await logActivity(req, { action: "CREATE", resource: "Ad", resource_id: ad._id, details: `Created ad (expires ${expiry_date})` });
 
         return apiResponse.ok(res, ad, messages.ADS_CREATED);
     } catch (err) {
@@ -48,9 +58,10 @@ const getAds = async (req, res) => {
 const updateAd = async (req, res) => {
     try {
         const { id } = req.params;
-        const { expiry_date } = req.body;
+        const { expiry_date, link_url } = req.body;
 
-        const ad_image = req.file?.filename;
+        const ad_image = req.files?.ad_image?.[0]?.filename;
+        const ad_video = req.files?.ad_video?.[0]?.filename;
 
         const ad = await Ads.findOne({
             _id: id,
@@ -59,6 +70,10 @@ const updateAd = async (req, res) => {
 
         if (!ad) {
             return apiResponse.notFoundResponse(res, messages.ADS_NOT_FOUND);
+        }
+
+        if (link_url && !/^https?:\/\/.+/i.test(link_url)) {
+            return apiResponse.badRequest(res, messages.INVALID_AD_LINK);
         }
 
         // ✅ All fields optional
@@ -70,7 +85,17 @@ const updateAd = async (req, res) => {
             ad.ad_image = ad_image;
         }
 
+        if (ad_video !== undefined) {
+            ad.ad_video = ad_video;
+        }
+
+        if (link_url !== undefined) {
+            ad.link_url = link_url || null;
+        }
+
         await ad.save();
+
+        await logActivity(req, { action: "UPDATE", resource: "Ad", resource_id: ad._id, details: "Updated ad" });
 
         return apiResponse.ok(res, ad, messages.ADS_UPDATED);
     } catch (err) {
@@ -94,6 +119,8 @@ const deleteAd = async (req, res) => {
         ad.is_deleted = true;
 
         await ad.save();
+
+        await logActivity(req, { action: "DELETE", resource: "Ad", resource_id: ad._id, details: "Deleted ad" });
 
         return apiResponse.ok(res, ad, messages.ADS_DELETED);
     } catch (err) {

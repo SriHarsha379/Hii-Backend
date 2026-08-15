@@ -11,6 +11,14 @@ const AdSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        ad_video: {
+            type: String,
+            default: null,
+        },
+        link_url: {
+            type: String,
+            default: null,
+        },
         expiry_date: {
             type: Date, // ✅ new field
         },

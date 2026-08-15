@@ -11,6 +11,10 @@ route
 
   .get("/get_vendor_by_id/:id", adminauth, vendorController.getVendorById)
 
+  // Organiser Requests review queue
+  .post("/approve_vendor/:id", adminauth, vendorController.approveVendor)
+  .post("/reject_vendor/:id", adminauth, vendorController.rejectVendor)
+
   .post("/add_vendor", adminauth, upload.single("business_image"), vendorController.createVendor)
 
   .put("/update_vendor/:id", adminauth, upload.single("business_image"), vendorController.updateVendor)

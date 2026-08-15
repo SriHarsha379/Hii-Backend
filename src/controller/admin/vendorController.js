@@ -6,15 +6,23 @@ import messages from "../../utility/messages.js";
 import { Vendor, Event, Venue, Booking, WithdrawRequest } from "../../model/index.js";
 import { updateVendorSchema } from "../../validation/admin/vendorValidation.js";
 import sendmail from "../../utility/sendmail.js"; // Add this import
+import logActivity from "../../utility/activityLogger.js";
 
 
-/* GET ALL VENDORS */
+/* GET ALL VENDORS
+   Supports optional ?is_verified=true|false filter — used by the "Organiser
+   Requests" review queue to list only pending (unapproved) signups, without
+   changing behavior for existing callers that don't pass it. */
 const getAllVendors = async (req, res) => {
   try {
     console.log('Fetching all vendors...');
 
-    const vendors = await Vendor.find({ is_deleted: false })
-      .select("name email phone_number city state is_active business_image createdAt vendor_type") // Add vendor_type
+    const filter = { is_deleted: false };
+    if (req.query.is_verified === 'true') filter.is_verified = true;
+    if (req.query.is_verified === 'false') filter.is_verified = false;
+
+    const vendors = await Vendor.find(filter)
+      .select("name email phone_number city state is_active is_verified rejection_reason business_image createdAt vendor_type") // Add vendor_type
       .populate('city', 'city_name')
       .populate('state', 'state_name')
       .sort({ createdAt: -1 });
@@ -50,6 +58,71 @@ const getVendorById = async (req, res) => {
     return apiResponse.ok(res, vendor, messages.SUCCESS);
   } catch (err) {
     console.error('Error fetching vendor by ID:', err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+/* ================= ORGANISER REQUESTS: APPROVE / REJECT =================
+   Powers the "Organiser Requests" review queue — new club/event organiser
+   signups land with is_verified: false and can't log in (see
+   vendorAuthController.vendorLogin) until a Super Admin approves them here.
+*/
+
+/* APPROVE VENDOR */
+const approveVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vendor = await Vendor.findOne({ _id: id, is_deleted: false });
+    if (!vendor) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
+
+    if (vendor.is_verified) {
+      return apiResponse.ok(res, vendor, "Vendor is already approved");
+    }
+
+    vendor.is_verified = true;
+    vendor.rejection_reason = null;
+    await vendor.save();
+
+    await logActivity(req, {
+      action: "UPDATE",
+      resource: "Vendor",
+      resource_id: vendor._id,
+      details: `Approved ${vendor.vendor_type === 'owner' ? 'club' : 'event organiser'} "${vendor.name}"`,
+    });
+
+    return apiResponse.ok(res, vendor, messages.VENDOR_APPROVED);
+  } catch (err) {
+    console.error('Error approving vendor:', err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+/* REJECT VENDOR */
+const rejectVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const vendor = await Vendor.findOne({ _id: id, is_deleted: false });
+    if (!vendor) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
+
+    vendor.is_verified = false;
+    vendor.is_active = false;
+    vendor.is_deleted = true;
+    vendor.rejection_reason = reason || null;
+    await vendor.save();
+
+    await logActivity(req, {
+      action: "DELETE",
+      resource: "Vendor",
+      resource_id: vendor._id,
+      details: `Rejected ${vendor.vendor_type === 'owner' ? 'club' : 'event organiser'} "${vendor.name}"${reason ? ` (${reason})` : ""}`,
+    });
+
+    return apiResponse.ok(res, vendor, messages.VENDOR_REJECTED);
+  } catch (err) {
+    console.error('Error rejecting vendor:', err);
     return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
   }
 };
@@ -191,6 +264,13 @@ const createVendor = async (req, res) => {
       .select("-password")
       .populate('city', 'city_name')
       .populate('state', 'state_name');
+
+    await logActivity(req, {
+      action: "CREATE",
+      resource: "Vendor",
+      resource_id: vendor._id,
+      details: `New ${vendor.vendor_type === 'owner' ? 'club' : 'event organiser'} signup: "${vendor.name}" — pending approval`,
+    });
 
     return apiResponse.created(res, vendorResponse, messages.VENDOR_CREATED);
   } catch (err) {
@@ -1083,6 +1163,8 @@ const deleteBankDetails = async (req, res) => {
 export default {
   getAllVendors,
   getVendorById,
+  approveVendor,
+  rejectVendor,
   createVendor,
   updateVendor,
   updateVendorStatus,

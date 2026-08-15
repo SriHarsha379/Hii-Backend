@@ -43,6 +43,7 @@ import Chat from "./chatModel.js";
 import Rating from "./ratingModel.js";
 import UserReport from "./userReportModel.js";
 import Ads from "./adsModel.js"
+import ActivityLog from "./activityLogModel.js"
 export {
   // admin model
   Admin,
@@ -87,5 +88,6 @@ export {
   Chat,
   Rating,
   UserReport,
-  Ads
+  Ads,
+  ActivityLog
 };

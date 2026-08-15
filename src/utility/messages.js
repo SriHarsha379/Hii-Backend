@@ -255,6 +255,8 @@ export default {
   VENDOR_LIST_FETCHED: ["Vendors fetched successfully"],
   VENDOR_NOT_FOUND: ["Vendor not found"],
   VENDOR_ALREADY_EXISTS: ["Vendor already exists"],
+  VENDOR_APPROVED: ["Organiser approved successfully"],
+  VENDOR_REJECTED: ["Organiser request rejected"],
   BUSINESS_NAME_REQUIRED: ["Business name is required"],
   OWNER_NAME_REQUIRED: ["Owner name is required"],
   EMAIL_REQUIRED: ["Email is required"],
@@ -349,7 +351,19 @@ export default {
   EXPIRYDATE_REQ:["Expire date is required"],
   ADS_CREATED:["Ad created successfully"],
   ADS_NOT_FOUND:["Ad not found"],
+  INVALID_AD_LINK: ["Link must be a valid URL starting with http:// or https://"],
   ADS_FOUND:["Ad found successfully"],
   ADS_UPDATED:["Ad updated successfully"],
   ADS_DELETED:["Ad updated successfully"],
+
+  // Admin user management
+  USER_STATUS_UPDATED: ["User status updated successfully"],
+  INVALID_USER_STATUS: ["Invalid status value. Must be ACTIVE, INACTIVE or BANNED"],
+  IMAGE_UPLOAD_SUCCESS: ["Image(s) uploaded successfully"],
+  NO_FILES_UPLOADED: ["No files were uploaded"],
+  BOOKINGS_FETCHED: ["Bookings fetched successfully"],
+  USER_REPORTS_FETCHED: ["User reports fetched successfully"],
+  REPORT_NOT_FOUND: ["Report not found"],
+  REPORT_STATUS_UPDATED: ["Report status updated successfully"],
+  ACTIVITY_LOGS_FETCHED: ["Activity logs fetched successfully"],
 };

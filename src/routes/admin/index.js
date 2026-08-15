@@ -32,6 +32,8 @@ import couponRoute from "./couponRoute.js";
 import vibeCheckRoute from "./vibeCheckRoute.js";
 import adsRoute from "./adsRoute.js"
 import notificationRoute from "./notificationRoute.js"
+import activityLogRoute from "./activityLogRoute.js"
+import supportRequestRoute from "./supportRequestRoute.js"
 
 
 const router = express.Router();
@@ -81,6 +83,10 @@ const routeArray = [
   { path: "/coupon", route: couponRoute },
   { path: "/ads", route: adsRoute },
   { path: "/notification", route: notificationRoute },
+  { path: "/activity-logs", route: activityLogRoute },
+  // Alias (singular) to support frontend paths using `/activity-log`
+  { path: "/activity-log", route: activityLogRoute },
+  { path: "/support-requests", route: supportRequestRoute },
 ];
 
 routeArray.forEach(({ path, route }) => router.use(path, route));

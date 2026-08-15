@@ -1,7 +1,8 @@
-import { User, Faq, ReportProblem, Content, Friendship, EventLike, Admin, Chat, VenueLike, UserBlock, Conversation } from "../../model/index.js";
+import { User, Faq, ReportProblem, Content, Friendship, EventLike, Admin, Chat, VenueLike, UserBlock, Conversation, Booking, UserReport } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import helper from "../../utility/helper.js";
+import logActivity from "../../utility/activityLogger.js";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import fs from "fs";
@@ -1474,8 +1475,333 @@ let checkConverationId = async (req, res) => {
   }
 }
 
+/* =======================================================================
+   ADMIN USER MANAGEMENT
+   (list / view / activate-deactivate-ban / soft-deleted list / bookings /
+   reports — powers the admin dashboard's Users page)
+======================================================================= */
+
+// Small helper: derive a display status from the boolean flags on the model,
+// since the schema itself doesn't store a single "status" string.
+const deriveUserStatus = (user) => {
+  if (user.is_deleted) return "DELETED";
+  if (user.is_banned) return "BANNED";
+  return user.is_active ? "ACTIVE" : "INACTIVE";
+};
+
+const withStatus = (userDoc) => {
+  const plain = typeof userDoc.toObject === "function" ? userDoc.toObject() : userDoc;
+  return { ...plain, status: deriveUserStatus(plain) };
+};
+
+// GET /user/get_all_user
+// Supports search (?search=), status filter (?status=ACTIVE|INACTIVE|BANNED),
+// city filter (?city_id=), pagination (?page=&limit=) and sorting
+// (?sort_by=&sort_order=asc|desc). Always excludes soft-deleted users.
+const getAllUsers = async (req, res) => {
+  try {
+    const {
+      search = "",
+      status,
+      city_id,
+      page = 1,
+      limit = 100,
+      sort_by = "createdAt",
+      sort_order = "desc"
+    } = req.query;
+
+    const filter = { is_deleted: false };
+
+    if (city_id) filter.city_id = city_id;
+
+    if (status) {
+      const normalized = String(status).toUpperCase();
+      if (normalized === "ACTIVE") {
+        filter.is_active = true;
+        filter.is_banned = { $ne: true };
+      } else if (normalized === "INACTIVE") {
+        filter.is_active = false;
+        filter.is_banned = { $ne: true };
+      } else if (normalized === "BANNED") {
+        filter.is_banned = true;
+      }
+    }
+
+    if (search) {
+      const regex = new RegExp(search.trim(), "i");
+      filter.$or = [
+        { name: regex },
+        { first_name: regex },
+        { last_name: regex },
+        { username: regex },
+        { email: regex },
+        { phone_number: regex }
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(500, parseInt(limit, 10) || 100));
+    const skip = (pageNum - 1) * limitNum;
+    const sortDir = String(sort_order).toLowerCase() === "asc" ? 1 : -1;
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select("-password -otp -email_otp -forget_otp")
+        .populate("city_id", "city_name")
+        .sort({ [sort_by]: sortDir })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      User.countDocuments(filter)
+    ]);
+
+    const data = users.map((u) => ({
+      ...u,
+      status: deriveUserStatus(u),
+      city: u.city_id?.city_name || null
+    }));
+
+    return apiResponse.ok(
+      res,
+      { users: data, total, page: pageNum, limit: limitNum },
+      messages.USER_LIST_FETCHED
+    );
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// GET /user/get_user_by_id/:id
+const getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findOne({ _id: id, is_deleted: false })
+      .select("-password -otp -email_otp -forget_otp")
+      .populate("city_id", "city_name")
+      .populate("music_genre", "genre_name")
+      .populate("event_preferences", "category_name");
+
+    if (!user) return apiResponse.notFoundResponse(res, messages.USER_NOT_FOUND);
+
+    return apiResponse.ok(res, withStatus(user), messages.SUCCESS);
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// POST /user/change_Status/:id  body: { status: 'ACTIVE' | 'INACTIVE' | 'BANNED', reason?: string }
+const updateUserStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body;
+
+    const normalized = String(status || "").toUpperCase();
+    if (!["ACTIVE", "INACTIVE", "BANNED"].includes(normalized)) {
+      return apiResponse.badRequest(res, messages.INVALID_USER_STATUS);
+    }
+
+    const user = await User.findOne({ _id: id, is_deleted: false });
+    if (!user) return apiResponse.notFoundResponse(res, messages.USER_NOT_FOUND);
+
+    if (normalized === "BANNED") {
+      user.is_banned = true;
+      user.is_active = false;
+      user.ban_reason = reason || user.ban_reason || null;
+    } else if (normalized === "ACTIVE") {
+      user.is_banned = false;
+      user.is_active = true;
+      user.ban_reason = null;
+    } else {
+      // INACTIVE
+      user.is_banned = false;
+      user.is_active = false;
+    }
+
+    await user.save();
+
+    await logActivity(req, {
+      action: "UPDATE",
+      resource: "User",
+      resource_id: user._id,
+      details: `Set status to ${normalized}${reason ? ` (${reason})` : ""} for ${user.name || user.email || user._id}`,
+    });
+
+    return apiResponse.ok(res, withStatus(user), messages.USER_STATUS_UPDATED);
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// GET /user/get_delete_user
+const getDeletedUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 100 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(500, parseInt(limit, 10) || 100));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [users, total] = await Promise.all([
+      User.find({ is_deleted: true })
+        .select("-password -otp -email_otp -forget_otp")
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      User.countDocuments({ is_deleted: true })
+    ]);
+
+    return apiResponse.ok(
+      res,
+      { users, total, page: pageNum, limit: limitNum },
+      messages.DELETED_USERS_FETCHED
+    );
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// GET /user/get_user_details/:id — richer profile view for the admin detail drawer
+const getUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findOne({ _id: id, is_deleted: false })
+      .select("-password -otp -email_otp -forget_otp")
+      .populate("city_id", "city_name")
+      .populate("music_genre", "genre_name")
+      .populate("event_preferences", "category_name")
+      .lean();
+
+    if (!user) return apiResponse.notFoundResponse(res, messages.USER_NOT_FOUND);
+
+    const [bookingCount, reportCount] = await Promise.all([
+      Booking.countDocuments({ user_id: id }),
+      UserReport.countDocuments({ reported_user: id })
+    ]);
+
+    return apiResponse.ok(
+      res,
+      {
+        ...user,
+        status: deriveUserStatus(user),
+        stats: { bookingCount, reportCount }
+      },
+      messages.SUCCESS
+    );
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// POST /user/image_uplod  (multipart, field: image[])
+const imageUpload = async (req, res) => {
+  try {
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return apiResponse.badRequest(res, messages.NO_FILES_UPLOADED);
+    }
+
+    const urls = files.map((f) => `/uploads/${f.filename}`);
+    return apiResponse.ok(res, { files: urls }, messages.IMAGE_UPLOAD_SUCCESS);
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// GET /user/get_user_bookings/:id
+const getUserBookings = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(200, parseInt(limit, 10) || 50));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [bookings, total] = await Promise.all([
+      Booking.find({ user_id: id })
+        .populate("event_id", "venue_name start_date end_date")
+        .populate("vendor_id", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Booking.countDocuments({ user_id: id })
+    ]);
+
+    return apiResponse.ok(res, { bookings, total, page: pageNum, limit: limitNum }, messages.BOOKINGS_FETCHED);
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// GET /user/get_all_user_reports  (?status=Pending|Reviewed|Resolved|Rejected)
+const getUserReports = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 100 } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(500, parseInt(limit, 10) || 100));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [reports, total] = await Promise.all([
+      UserReport.find(filter)
+        .populate("reported_by", "name email profile_image")
+        .populate("reported_user", "name email profile_image")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      UserReport.countDocuments(filter)
+    ]);
+
+    return apiResponse.ok(res, { reports, total, page: pageNum, limit: limitNum }, messages.USER_REPORTS_FETCHED);
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// POST /user/update_report_status  body: { report_id, status, admin_note?, action_taken? }
+const updateUserReportStatus = async (req, res) => {
+  try {
+    const { report_id, status, admin_note, action_taken } = req.body;
+
+    if (!report_id || !status) {
+      return apiResponse.badRequest(res, messages.SERVER_ERROR);
+    }
+
+    const validStatuses = ["Pending", "Reviewed", "Resolved", "Rejected"];
+    if (!validStatuses.includes(status)) {
+      return apiResponse.badRequest(res, messages.INVALID_USER_STATUS);
+    }
+
+    const update = { status };
+    if (admin_note !== undefined) update.admin_note = admin_note;
+    if (action_taken !== undefined) update.action_taken = action_taken;
+
+    const report = await UserReport.findByIdAndUpdate(report_id, update, { new: true });
+    if (!report) return apiResponse.notFoundResponse(res, messages.REPORT_NOT_FOUND);
+
+    return apiResponse.ok(res, report, messages.REPORT_STATUS_UPDATED);
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
 export default {
   admindetails, checkConverationId,
   editProfile, updateProfileVisibility, getSwipeProfileSettings, updateMyVisibility, updateGalleryItemVisibility, deleteAccount, getFaqForCustomer, reportProblem, getSupportEmail, updateUserInterests, getMyProfile, uploadUserGallery, updateUserHobbies, getRecentLikedItems,
-  updateSocialAccount, addUserVibes, addUserEventPreferences, deleteUserGalleryItem, updateNotificationSetting, userChangePassword, enableTwoFA, getMyVisibility, getNotificationSettings
+  updateSocialAccount, addUserVibes, addUserEventPreferences, deleteUserGalleryItem, updateNotificationSetting, userChangePassword, enableTwoFA, getMyVisibility, getNotificationSettings,
+  // admin user management
+  getAllUsers, getUserById, updateUserStatus, getDeletedUsers, getUserDetails, imageUpload, getUserBookings, getUserReports, updateUserReportStatus
 };

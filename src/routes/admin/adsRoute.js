@@ -7,8 +7,8 @@ const route = express.Router();
 
 route
     .get("/get_all", allowAdminOrVendor, adsController.getAds)
-    .post("/create", allowAdminOrVendor,upload.single('ad_image'),adsController.createAd)
-    .post("/update/:id", allowAdminOrVendor, upload.single('ad_image'),adsController.updateAd)
+    .post("/create", allowAdminOrVendor, upload.fields([{ name: 'ad_image', maxCount: 1 }, { name: 'ad_video', maxCount: 1 }]), adsController.createAd)
+    .post("/update/:id", allowAdminOrVendor, upload.fields([{ name: 'ad_image', maxCount: 1 }, { name: 'ad_video', maxCount: 1 }]), adsController.updateAd)
     .post("/delete/:id", allowAdminOrVendor, adsController.deleteAd)
 
 export default route;

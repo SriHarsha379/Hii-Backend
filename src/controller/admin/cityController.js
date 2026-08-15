@@ -2,6 +2,7 @@ import { City, State } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import moment from 'moment';
+import logActivity from "../../utility/activityLogger.js";
 
 const createCity = async (req, res) => {
     try {
@@ -36,6 +37,8 @@ const createCity = async (req, res) => {
         });
 
         await city.save();
+
+        await logActivity(req, { action: "CREATE", resource: "City", resource_id: city._id, details: `Created city "${city.city_name}"` });
 
         return apiResponse.ok(res, city, messages.CITY_CREATED);
     } catch (err) {
