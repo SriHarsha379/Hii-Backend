@@ -7,7 +7,7 @@ const route = express.Router();
 
 route.post(
   "/create_event",
-  vendorauth,
+  allowAdminOrVendor,
   upload.fields([
     { name: "venue_image", maxCount: 1 },
     { name: "artist_images", maxCount: 20 },
@@ -26,7 +26,7 @@ route.get("/get_event_by_id/:id", allowAdminOrVendor, eventController.getEventBy
 
 route.put(
   "/update_event/:id",
-  vendorauth,
+  allowAdminOrVendor,
   upload.fields([
     { name: "venue_image", maxCount: 1 },
     { name: "artist_image", maxCount: 1 },  // Added artist image
@@ -36,6 +36,11 @@ route.put(
   eventController.updateEvent
 );
 
-route.delete("/delete_event/:id", vendorauth, eventController.deleteEvent);
+route.delete("/delete_event/:id", allowAdminOrVendor, eventController.deleteEvent);
+
+// Featured Events — was entirely missing (no route, no model field).
+route.get("/featured", allowAdminOrVendor, eventController.getFeaturedEvents);
+route.post("/feature/:id", allowAdminOrVendor, eventController.featureEvent);
+route.post("/unfeature/:id", allowAdminOrVendor, eventController.unfeatureEvent);
 
 export default route;

@@ -15,6 +15,14 @@ const AdSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        video_width: {
+            type: Number,
+            default: null,
+        },
+        video_height: {
+            type: Number,
+            default: null,
+        },
         link_url: {
             type: String,
             default: null,

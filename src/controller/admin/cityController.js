@@ -48,14 +48,29 @@ const createCity = async (req, res) => {
 };
 
 
+// GET /city/get_all_cities
+// Default: only active cities (used by every filter dropdown across the
+// app — Featured Events, Events, Venues, etc. — so admins control exactly
+// which cities are selectable there via the Manage Filters > Cities tab).
+// ?include_inactive=true: returns every non-deleted city regardless of
+// active status — used only by the Users page filter and the Manage
+// Filters city management view itself, since a user can be registered
+// from any city even if that city isn't currently "active" for curated
+// filtering purposes.
+// Always sorted alphabetically by city name (not creation order).
 const getCity = async (req, res) => {
     try {
-        const city = await City.find({ is_active: true, is_deleted: false })
+        const filter = req.query.include_inactive === 'true'
+            ? { is_deleted: false }
+            : { is_active: true, is_deleted: false };
+
+        const city = await City.find(filter)
             .populate({
                 path: "state_id",
                 select: "state_name",
             })
-            .sort({ createdAt: -1 });
+            .collation({ locale: "en", strength: 2 }) // case-insensitive alphabetical sort
+            .sort({ city_name: 1 });
 
         return apiResponse.ok(res, city, messages.SUCCESS);
     } catch (err) {
@@ -157,4 +172,36 @@ const deleteCity = async (req, res) => {
     }
 };
 
-export default { createCity, getCity, updateCity, deleteCity }
+// POST /city/toggle_status/:id
+// Genuine activate/deactivate — unlike deleteCity (which also sets
+// is_deleted:true), this just flips is_active so the city stays in the
+// system and can be reactivated later. This is what "only Bangalore,
+// Delhi, Goa & Mumbai should be active for filters" should use, rather
+// than deleting the other cities outright.
+const toggleCityStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const city = await City.findOne({ _id: id, is_deleted: false });
+        if (!city) {
+            return apiResponse.notFoundResponse(res, messages.CITY_NOT_FOUND);
+        }
+
+        city.is_active = !city.is_active;
+        await city.save();
+
+        await logActivity(req, {
+            action: "UPDATE",
+            resource: "City",
+            resource_id: city._id,
+            details: `${city.is_active ? "Activated" : "Deactivated"} city "${city.city_name}"`,
+        });
+
+        return apiResponse.ok(res, city, messages.SUCCESS);
+    } catch (err) {
+        console.error(err);
+        return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+    }
+};
+
+export default { createCity, getCity, updateCity, deleteCity, toggleCityStatus }

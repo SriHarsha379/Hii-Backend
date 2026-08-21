@@ -1,5 +1,5 @@
 /** @format */
-import { Event, Category } from "../../model/index.js";
+import { Event, Category, Vendor } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 
@@ -7,7 +7,25 @@ import messages from "../../utility/messages.js";
 // ---------------- CREATE EVENT ------------------
 const createEvent = async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    // Was hardcoded to `req.vendor._id`, which only exists when the caller
+    // authenticated as a vendor (vendorauth). Now that admins can also hit
+    // this route (allowAdminOrVendor), an admin must specify which
+    // club/organiser the event belongs to via `vendor_id` in the body.
+    const vendorId = req.vendor ? req.vendor._id : req.body.vendor_id;
+
+    if (!vendorId) {
+      return apiResponse.badRequest(
+        res,
+        "vendor_id is required when creating an event as an admin (select the club/organiser this event belongs to)"
+      );
+    }
+
+    if (!req.vendor) {
+      const vendorExists = await Vendor.findOne({ _id: vendorId, is_deleted: false });
+      if (!vendorExists) {
+        return apiResponse.badRequest(res, "Selected club/organiser not found");
+      }
+    }
 
     const {
       venue_name,
@@ -246,8 +264,14 @@ const createEvent = async (req, res) => {
 // ---------------- UPDATE EVENT --------------------
 const updateEvent = async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
     const { id } = req.params;
+
+    // Vendors can only edit their own events; admins can edit any event.
+    const lookupFilter = req.vendor
+      ? { _id: id, vendor_id: req.vendor._id, is_deleted: false }
+      : { _id: id, is_deleted: false };
+
+    const eventExists = await Event.findOne(lookupFilter);
 
     const {
       venue_name,
@@ -269,12 +293,6 @@ const updateEvent = async (req, res) => {
       existing_gallery_images,
       existing_event_layout_images
     } = req.body;
-
-    const eventExists = await Event.findOne({
-      _id: id,
-      vendor_id: vendorId,
-      is_deleted: false
-    });
 
     if (!eventExists) {
       return apiResponse.notFoundResponse(res, "Event not found");
@@ -608,10 +626,13 @@ const getEventById = async (req, res) => {
 // ---------------- DELETE EVENT --------------------
 const deleteEvent = async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    // Vendors can only delete their own events; admins can delete any event.
+    const lookupFilter = req.vendor
+      ? { _id: req.params.id, vendor_id: req.vendor._id }
+      : { _id: req.params.id };
 
     const deletedEvent = await Event.findOneAndUpdate(
-      { _id: req.params.id, vendor_id: vendorId },
+      lookupFilter,
       { is_deleted: true },
       { new: true }
     );
@@ -626,10 +647,74 @@ const deleteEvent = async (req, res) => {
   }
 };
 
+/* ================= FEATURE EVENT =================
+   Was completely unbuilt server-side — the dashboard's "Featured" button
+   called POST /events/feature, which had no route at all. Sets
+   is_featured + an expiry (featured_until) based on the requested
+   duration, and an optional city scope. */
+const featureEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { duration, city } = req.body;
+
+    const days = Math.max(1, Math.min(30, Number(duration) || 7)); // matches the "MAX 30 DAYS" cap already shown in the UI
+    const featured_until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    const event = await Event.findOneAndUpdate(
+      { _id: id, is_deleted: false },
+      { is_featured: true, featured_until, featured_city: city && city !== 'all' ? city : null },
+      { new: true }
+    );
+
+    if (!event) return apiResponse.notFoundResponse(res, "Event not found");
+    return apiResponse.ok(res, event, "Event featured successfully");
+  } catch (error) {
+    return apiResponse.serverError(res, "Server error", error.message);
+  }
+};
+
+const unfeatureEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const event = await Event.findOneAndUpdate(
+      { _id: id, is_deleted: false },
+      { is_featured: false, featured_until: null, featured_city: null },
+      { new: true }
+    );
+    if (!event) return apiResponse.notFoundResponse(res, "Event not found");
+    return apiResponse.ok(res, event, "Event unfeatured successfully");
+  } catch (error) {
+    return apiResponse.serverError(res, "Server error", error.message);
+  }
+};
+
+// GET /events/featured — real list of currently-featured events (only
+// those whose featured_until hasn't already passed), for the "Featured"
+// tab to actually show a list, instead of only offering a way to feature
+// a new one.
+const getFeaturedEvents = async (req, res) => {
+  try {
+    const events = await Event.find({
+      is_deleted: false,
+      is_featured: true,
+      $or: [{ featured_until: null }, { featured_until: { $gte: new Date() } }],
+    })
+      .populate("category_ids", "category_name")
+      .sort({ featured_until: 1 });
+
+    return apiResponse.ok(res, events, "Featured events fetched successfully");
+  } catch (error) {
+    return apiResponse.serverError(res, "Server error", error.message);
+  }
+};
+
 export default {
   createEvent,
   getAllEvents,
   getEventById,
   updateEvent,
   deleteEvent,
+  featureEvent,
+  unfeatureEvent,
+  getFeaturedEvents,
 };

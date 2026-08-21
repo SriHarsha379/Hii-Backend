@@ -34,6 +34,7 @@ import adsRoute from "./adsRoute.js"
 import notificationRoute from "./notificationRoute.js"
 import activityLogRoute from "./activityLogRoute.js"
 import supportRequestRoute from "./supportRequestRoute.js"
+import analyticsRoute from "./analyticsRoute.js"
 
 
 const router = express.Router();
@@ -87,6 +88,7 @@ const routeArray = [
   // Alias (singular) to support frontend paths using `/activity-log`
   { path: "/activity-log", route: activityLogRoute },
   { path: "/support-requests", route: supportRequestRoute },
+  { path: "/analytics", route: analyticsRoute },
 ];
 
 routeArray.forEach(({ path, route }) => router.use(path, route));

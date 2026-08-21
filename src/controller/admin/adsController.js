@@ -6,7 +6,7 @@ import logActivity from "../../utility/activityLogger.js";
 /* ================= CREATE AD ================= */
 const createAd = async (req, res) => {
     try {
-        const { expiry_date, link_url } = req.body;
+        const { expiry_date, link_url, video_width, video_height } = req.body;
         const ad_image = req.files?.ad_image?.[0]?.filename;
         const ad_video = req.files?.ad_video?.[0]?.filename;
 
@@ -22,9 +22,18 @@ const createAd = async (req, res) => {
             return apiResponse.badRequest(res, messages.INVALID_AD_LINK);
         }
 
+        // Video dimensions are required whenever a video is attached — the
+        // app needs the exact aspect ratio ahead of time to avoid layout
+        // shift while the video loads; a "recommended" hint isn't enough.
+        if (ad_video && (!video_width || !video_height)) {
+            return apiResponse.badRequest(res, messages.VIDEO_DIMENSIONS_REQ);
+        }
+
         const ad = new Ads({
             ad_image,
             ad_video: ad_video || null,
+            video_width: ad_video ? Number(video_width) : null,
+            video_height: ad_video ? Number(video_height) : null,
             link_url: link_url || null,
             expiry_date: expiry_date || null
         });
@@ -58,7 +67,7 @@ const getAds = async (req, res) => {
 const updateAd = async (req, res) => {
     try {
         const { id } = req.params;
-        const { expiry_date, link_url } = req.body;
+        const { expiry_date, link_url, video_width, video_height } = req.body;
 
         const ad_image = req.files?.ad_image?.[0]?.filename;
         const ad_video = req.files?.ad_video?.[0]?.filename;
@@ -76,6 +85,13 @@ const updateAd = async (req, res) => {
             return apiResponse.badRequest(res, messages.INVALID_AD_LINK);
         }
 
+        // If a new video is being attached (either now or already present
+        // on the ad), dimensions must be provided.
+        const willHaveVideo = ad_video || ad.ad_video;
+        if (willHaveVideo && ad_video && (!video_width || !video_height)) {
+            return apiResponse.badRequest(res, messages.VIDEO_DIMENSIONS_REQ);
+        }
+
         // ✅ All fields optional
         if (expiry_date !== undefined) {
             ad.expiry_date = expiry_date;
@@ -87,6 +103,12 @@ const updateAd = async (req, res) => {
 
         if (ad_video !== undefined) {
             ad.ad_video = ad_video;
+            ad.video_width = video_width ? Number(video_width) : ad.video_width;
+            ad.video_height = video_height ? Number(video_height) : ad.video_height;
+        } else if (video_width && video_height) {
+            // Dimensions updated without replacing the video file itself.
+            ad.video_width = Number(video_width);
+            ad.video_height = Number(video_height);
         }
 
         if (link_url !== undefined) {

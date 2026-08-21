@@ -20,7 +20,18 @@ const checkVendorVenueExists = async (vendorId, excludeId = null) => {
 
 const createVenue = async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    // Was hardcoded to `req.vendor._id`, which only exists when the caller
+    // authenticated as a vendor. Admins can now also hit this route
+    // (allowAdminOrVendor) and must specify which vendor/club this venue
+    // belongs to via `vendor_id` in the body — same fix applied to events.
+    const vendorId = req.vendor ? req.vendor._id : req.body.vendor_id;
+
+    if (!vendorId) {
+      return apiResponse.badRequest(
+        res,
+        "vendor_id is required when creating a venue as an admin (select the club/organiser this venue belongs to)"
+      );
+    }
 
     const existingVenue = await checkVendorVenueExists(vendorId);
     if (existingVenue) {
@@ -158,7 +169,6 @@ const createVenue = async (req, res) => {
 
 const updateVenue = async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
     const { id } = req.params;
 
     const {
@@ -181,10 +191,12 @@ const updateVenue = async (req, res) => {
       terms_and_conditions
     } = req.body;
 
-    const venueExists = await Venue.findOne({
-      _id: id,
-      vendor_id: vendorId
-    });
+    // Vendors can only edit their own venue; admins can edit any venue.
+    const lookupFilter = req.vendor
+      ? { _id: id, vendor_id: req.vendor._id }
+      : { _id: id };
+
+    const venueExists = await Venue.findOne(lookupFilter);
 
     if (!venueExists) {
       return apiResponse.notFoundResponse(res, "Venue not found");
@@ -306,7 +318,7 @@ const updateVenue = async (req, res) => {
     }
 
     const updatedVenue = await Venue.findOneAndUpdate(
-      { _id: id, vendor_id: vendorId },
+      lookupFilter,
       updateData,
       { new: true }
     );
@@ -385,10 +397,13 @@ const getVenueById = async (req, res) => {
 // ---------------- DELETE VENUE --------------------
 const deleteVenue = async (req, res) => {
   try {
-    const vendorId = req.vendor._id;
+    // Vendors can only delete their own venue; admins can delete any venue.
+    const lookupFilter = req.vendor
+      ? { _id: req.params.id, vendor_id: req.vendor._id }
+      : { _id: req.params.id };
 
     const deletedVenue = await Venue.findOneAndUpdate(
-      { _id: req.params.id, vendor_id: vendorId },
+      lookupFilter,
       { is_deleted: true },
       { new: true }
     );

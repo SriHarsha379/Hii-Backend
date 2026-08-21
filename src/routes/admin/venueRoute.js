@@ -10,7 +10,7 @@ route.get("/my-venue", vendorauth, venueController.getVenueByVendor);
 
 route.post(
   "/create_venue",
-  vendorauth,
+  allowAdminOrVendor,
   upload.fields([
     { name: "venue_image", maxCount: 1 },
     { name: "gallery_images", maxCount: 10 },
@@ -27,7 +27,7 @@ route.get("/get_venue_by_id/:id", allowAdminOrVendor, venueController.getVenueBy
 
 route.put(
   "/update_venue/:id",
-  vendorauth,
+  allowAdminOrVendor,
   upload.fields([
     { name: "venue_image", maxCount: 1 },
     { name: "gallery_images", maxCount: 10 },
@@ -35,6 +35,6 @@ route.put(
   venueController.updateVenue
 );
 
-route.delete("/delete_venue/:id", vendorauth, venueController.deleteVenue);
+route.delete("/delete_venue/:id", allowAdminOrVendor, venueController.deleteVenue);
 
 export default route;
