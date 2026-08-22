@@ -496,6 +496,7 @@ const checkAndNotifyProfileCompletion = async (userId, { silent = false } = {}) 
   }
 };
 
+
 export default {
   formatEventBookedTime,
   dataHelperchat,

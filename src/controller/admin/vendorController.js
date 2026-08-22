@@ -7,6 +7,7 @@ import { Vendor, Event, Venue, Booking, WithdrawRequest } from "../../model/inde
 import { updateVendorSchema } from "../../validation/admin/vendorValidation.js";
 import sendmail from "../../utility/sendmail.js"; // Add this import
 import logActivity from "../../utility/activityLogger.js";
+import vendorOtpController from "./vendorOtpController.js";
 
 
 /* GET ALL VENDORS
@@ -21,8 +22,16 @@ const getAllVendors = async (req, res) => {
     if (req.query.is_verified === 'true') filter.is_verified = true;
     if (req.query.is_verified === 'false') filter.is_verified = false;
 
+    // FIXED: was an explicit include-list (`.select("name email ...")`)
+    // that predated capacity/contact_person/description/address/landmark
+    // being added to the schema — those fields were saving correctly (see
+    // updateVendor) but got silently stripped out of every list response
+    // here, so the Profile page always looked empty after a reload even
+    // though the save genuinely worked. Switched to an exclude-list so
+    // this can't quietly happen again the next time a field is added —
+    // only password is excluded now, everything else passes through.
     const vendors = await Vendor.find(filter)
-      .select("name email phone_number city state is_active is_verified rejection_reason business_image createdAt vendor_type") // Add vendor_type
+      .select("-password")
       .populate('city', 'city_name')
       .populate('state', 'state_name')
       .sort({ createdAt: -1 });
@@ -45,7 +54,7 @@ const getVendorById = async (req, res) => {
       _id: id,
       is_deleted: false,
     })
-      .select("name email phone_number city state is_active business_image createdAt address landmark vendor_type")
+      .select("-password")
       .populate('city', 'city_name')
       .populate('state', 'state_name');
 
@@ -157,6 +166,17 @@ const createVendor = async (req, res) => {
     if (!name || !email || !phone_number || !city || !state || !address || !password || !vendor_type) {
       console.log('Missing required fields');
       return apiResponse.badRequest(res, "All fields are required including vendor type");
+    }
+
+    // Email OTP verification — only enforced for CLUB_ADMIN self-registration
+    // (the flow this was actually built for). Super Admin creating a vendor
+    // manually (Organiser Requests / Admins management) never goes through
+    // the OTP step at all, so this must not block that existing flow.
+    if (req.user && req.user.role !== 'SUPER_ADMIN') {
+      const isVerified = await vendorOtpController.isEmailVerifiedForRegistration(email);
+      if (!isVerified) {
+        return apiResponse.badRequest(res, "Please verify your email with the OTP before completing registration.");
+      }
     }
 
     // Validate vendor_type
@@ -272,6 +292,12 @@ const createVendor = async (req, res) => {
       details: `New ${vendor.vendor_type === 'owner' ? 'club' : 'event organiser'} signup: "${vendor.name}" — pending approval`,
     });
 
+    // Clean up the now-used OTP verification record — only relevant when
+    // this was a CLUB_ADMIN self-registration in the first place.
+    if (req.user && req.user.role !== 'SUPER_ADMIN') {
+      await vendorOtpController.consumeVerifiedOtp(email);
+    }
+
     return apiResponse.created(res, vendorResponse, messages.VENDOR_CREATED);
   } catch (err) {
     console.error('❌ Error creating vendor:', err);
@@ -301,7 +327,7 @@ const createVendor = async (req, res) => {
 const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone_number, city, state, address, landmark, password, vendor_type } = req.body;
+    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description } = req.body;
 
     console.log('🔄 Updating vendor:', id);
     console.log('📥 Request body:', req.body);
@@ -409,6 +435,21 @@ const updateVendor = async (req, res) => {
     if (landmark !== undefined && landmark !== vendor.landmark) {
       updates.landmark = landmark;
       changes.push(`Landmark updated`);
+      hasChanges = true;
+    }
+    if (contact_person !== undefined && contact_person !== vendor.contact_person) {
+      updates.contact_person = contact_person;
+      changes.push(`Contact person updated`);
+      hasChanges = true;
+    }
+    if (capacity !== undefined && capacity !== '' && Number(capacity) !== vendor.capacity) {
+      updates.capacity = Number(capacity);
+      changes.push(`Capacity updated`);
+      hasChanges = true;
+    }
+    if (description !== undefined && description !== vendor.description) {
+      updates.description = description;
+      changes.push(`Description updated`);
       hasChanges = true;
     }
 

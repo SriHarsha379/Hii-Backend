@@ -54,6 +54,23 @@ const VendorSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Was collected in the admin dashboard's "Profile" edit form but had
+    // nowhere to actually save — these fields never existed on this schema.
+    contact_person: {
+      type: String,
+      default: "",
+    },
+
+    capacity: {
+      type: Number,
+      default: null,
+    },
+
+    description: {
+      type: String,
+      default: "",
+    },
+
     password: {
       type: String,
       required: true,

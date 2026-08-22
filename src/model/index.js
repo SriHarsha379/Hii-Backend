@@ -21,6 +21,7 @@ import VenueLike from './venueLikeModel.js'
 import Ticket from './ticketModel.js'
 import Genre from './genreModel.js'
 import Vendor from './vendorModel.js'
+import PendingVendorOtp from './pendingVendorOtpModel.js'
 import Service from './serviceModel.js'
 import withdraw from "./withdrawModel.js";
 import Earning from "./earningModel.js";
@@ -63,6 +64,7 @@ export {
   Category,
   Genre,
   Vendor,
+  PendingVendorOtp,
   Service,
   // app model
   User,

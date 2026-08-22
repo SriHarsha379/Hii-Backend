@@ -1,6 +1,7 @@
 import express from "express";
 import vendorController from "../../controller/admin/vendorController.js";
 import vendorAuthController from "../../controller/admin/vendorAuthController.js";
+import vendorOtpController from "../../controller/admin/vendorOtpController.js";
 import { adminauth, vendorauth } from "../../middleware/authMiddleware.js";
 import upload from "../../config/multer_config.js";
 
@@ -38,5 +39,11 @@ route
   .post("/add_bank_details", vendorauth, vendorController.addBankDetails)
   .put("/edit_bank_details", vendorauth, vendorController.editBankDetails)
   .delete("/delete_bank_details", vendorauth, vendorController.deleteBankDetails)
+
+  // Email OTP for club registration — the person is already authenticated
+  // with an existing (organisation-less) Admin token by the time they
+  // reach this step, via adminauth, same as the rest of registration.
+  .post("/send_registration_otp", adminauth, vendorOtpController.sendRegistrationOtp)
+  .post("/verify_registration_otp", adminauth, vendorOtpController.verifyRegistrationOtp)
 
 export default route;

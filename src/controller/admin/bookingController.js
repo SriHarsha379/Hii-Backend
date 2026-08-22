@@ -5,10 +5,18 @@ import messages from "../../utility/messages.js";
 // import { getCommissionPercent } from "../../utility/commissionUtility.js";
 import ticketController from "./ticketController.js";
 
-// Helper to determine vendor filter (vendor user vs admin)
+// Helper to determine vendor filter (vendor user vs admin).
+// FIXED: previously "isAdmin" meant "see every booking platform-wide" —
+// correct for SUPER_ADMIN/NORMAL_ADMIN, but wrong for CLUB_ADMIN, who
+// authenticates as an admin-type token too (allowAdminOrVendor sets
+// req.user, not req.vendor, for any admin role) yet should only ever see
+// bookings for their own venue. Now respects an explicit ?vendor_id= query
+// param when the caller is an admin, so the Club Admin dashboard can scope
+// itself instead of accidentally seeing every vendor's bookings.
 const resolveVendorFilter = (req) => {
-    const vendorId = req.vendor?._id || null;
+    if (req.vendor?._id) return { vendorId: req.vendor._id, isAdmin: false };
     const isAdmin = !!req.user;
+    const vendorId = isAdmin && req.query.vendor_id ? req.query.vendor_id : null;
     return { vendorId, isAdmin };
 };
 
@@ -21,7 +29,7 @@ const getAllBooking = async (req, res) => {
 
         const query = { is_deleted: false };
         if (vendorId) query.vendor_id = vendorId;
-        
+
         // Type filter जोड़ें
         if (type && ['event', 'venue'].includes(type)) {
             query.booking_type = type;
@@ -57,7 +65,11 @@ const getAllBooking = async (req, res) => {
                 transaction_id: booking.transaction_id || '',
                 booking_type: booking.booking_type || '',
                 is_active: booking.is_active,
-                status: booking.status || 'confirmed',
+                // FIXED: schema field is `booking_status`, not `status` —
+                // this always fell back to 'confirmed' regardless of the
+                // real value (cancelled/completed bookings would have
+                // shown as confirmed too).
+                status: booking.booking_status || 'confirmed',
                 payment_status: booking.payment_status || 'paid',
                 num_tickets: booking.num_tickets || 1,
                 booking_reference: booking.booking_reference || '',
@@ -167,7 +179,7 @@ const getBookingById = async (req, res) => {
             createdAt: booking.createdAt,
             updatedAt: booking.updatedAt,
             booking_reference: booking.booking_reference || '',
-            
+
             // Contact Information
             contact_info: booking.contact_info || {
                 first_name: '',
@@ -307,32 +319,38 @@ const getEventBookings = async (req, res) => {
 // ✅ Update booking status (for cancellations, refunds, etc.)
 const updateBookingStatus = async (req, res) => {
     try {
-        const vendor_id = req.vendor._id;
+        // FIXED: was hardcoded to `req.vendor._id`, which crashes for any
+        // admin-role caller (req.vendor is only set for vendor tokens) —
+        // same gap already fixed on Events/Venues, now relevant here too
+        // since the route was just opened up to allowAdminOrVendor.
+        const { vendorId } = resolveVendorFilter(req);
         const { id } = req.params;
-        const { status, refund_status, notes } = req.body;
+        const { status, notes } = req.body;
 
-        const booking = await Booking.findOne({
-            _id: id,
-            vendor_id,
-            is_deleted: false
-        }).populate('ticket_id');
+        const bookingFilter = { _id: id, is_deleted: false };
+        if (vendorId) bookingFilter.vendor_id = vendorId;
+
+        const booking = await Booking.findOne(bookingFilter).populate('ticket_id');
 
         if (!booking) {
             return apiResponse.notFoundResponse(res, messages.BOOKING_NOT_FOUND[0]);
         }
 
-        const oldStatus = booking.status;
+        // FIXED: schema field is `booking_status`, not `status` — writing to
+        // `booking.status` was silently doing nothing (Mongoose drops
+        // unknown fields on save by default), so this endpoint never
+        // actually changed a booking's real status despite returning success.
+        const oldStatus = booking.booking_status;
         const session = await Booking.startSession();
         session.startTransaction();
 
         try {
             // Update booking
-            booking.status = status || booking.status;
-            booking.refund_status = refund_status || booking.refund_status;
+            booking.booking_status = status || booking.booking_status;
             booking.updatedAt = new Date();
-            
+
             if (notes) {
-                booking.cancellation_notes = notes;
+                booking.special_request = notes;
             }
 
             await booking.save({ session });
