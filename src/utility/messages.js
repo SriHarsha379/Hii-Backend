@@ -314,6 +314,7 @@ export default {
   INVALID_CREDENTIALS: ["Invalid credentials provided"],
   ACCOUNT_DEACTIVATE_BY_ADMIN: ["Your account has been deactivated by admin"],
   MOBILE_NUMBER_CHECK: ["Mobile number is already register with us"],
+  MSG_EMAIL_EXISTS: ["This email is already registered. Please log in instead."],
 
   // Vendor messages
   VENDOR_NOT_FOUND: "Vendor not found",

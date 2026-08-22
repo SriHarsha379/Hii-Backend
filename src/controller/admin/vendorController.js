@@ -18,9 +18,22 @@ const getAllVendors = async (req, res) => {
   try {
     console.log('Fetching all vendors...');
 
-    const filter = { is_deleted: false };
-    if (req.query.is_verified === 'true') filter.is_verified = true;
-    if (req.query.is_verified === 'false') filter.is_verified = false;
+    // FIXED: was an exact-match `is_deleted: false`, which silently
+    // excludes any legacy vendor document that predates this field being
+    // added to the schema — those documents don't have is_deleted set to
+    // false, they just don't have it at all, and Mongoose's exact-match
+    // filtering (which runs at the raw-document level, before schema
+    // defaults are applied) doesn't treat "missing" as equivalent to
+    // "false". Several real seed vendors (e.g. "The Vault") were silently
+    // invisible to Organiser Requests because of exactly this.
+    const filter = { is_deleted: { $ne: true } };
+    // FIXED: exact-match `is_verified: false/true` had the same problem
+    // as is_deleted above — confirmed directly via a diagnostic query,
+    // which found 5 real pending vendors (including "The Vault") that a
+    // strict `is_verified: false` match was silently excluding. Same fix:
+    // type-loose matching instead of exact equality.
+    if (req.query.is_verified === 'true') filter.is_verified = { $ne: false };
+    if (req.query.is_verified === 'false') filter.is_verified = { $ne: true };
 
     // FIXED: was an explicit include-list (`.select("name email ...")`)
     // that predated capacity/contact_person/description/address/landmark
@@ -52,7 +65,7 @@ const getVendorById = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: id,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     })
       .select("-password")
       .populate('city', 'city_name')
@@ -82,16 +95,26 @@ const approveVendor = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const vendor = await Vendor.findOne({ _id: id, is_deleted: false });
-    if (!vendor) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
+    const existing = await Vendor.findOne({ _id: id, is_deleted: { $ne: true } });
+    if (!existing) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
 
-    if (vendor.is_verified) {
-      return apiResponse.ok(res, vendor, "Vendor is already approved");
+    if (existing.is_verified) {
+      return apiResponse.ok(res, existing, "Vendor is already approved");
     }
 
-    vendor.is_verified = true;
-    vendor.rejection_reason = null;
-    await vendor.save();
+    // FIXED: was `.findOne()` + mutate + `.save()` — Mongoose's `.save()`
+    // re-validates the ENTIRE document, not just the changed fields. Some
+    // seed/legacy vendor records predate the current schema (city stored
+    // as a plain string instead of an ObjectId reference, missing
+    // password/state/phone_number entirely), so approving them failed
+    // outright on unrelated pre-existing data issues, even though only
+    // is_verified was being changed. findOneAndUpdate only validates the
+    // fields actually being set.
+    const vendor = await Vendor.findOneAndUpdate(
+      { _id: id, is_deleted: { $ne: true } },
+      { is_verified: true, rejection_reason: null },
+      { new: true, runValidators: false }
+    );
 
     await logActivity(req, {
       action: "UPDATE",
@@ -113,14 +136,16 @@ const rejectVendor = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
 
-    const vendor = await Vendor.findOne({ _id: id, is_deleted: false });
-    if (!vendor) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
+    const existing = await Vendor.findOne({ _id: id, is_deleted: { $ne: true } });
+    if (!existing) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
 
-    vendor.is_verified = false;
-    vendor.is_active = false;
-    vendor.is_deleted = true;
-    vendor.rejection_reason = reason || null;
-    await vendor.save();
+    // Same fix as approveVendor — findOneAndUpdate instead of save(), to
+    // avoid full-document validation failing on unrelated legacy data.
+    const vendor = await Vendor.findOneAndUpdate(
+      { _id: id, is_deleted: { $ne: true } },
+      { is_verified: false, is_active: false, is_deleted: true, rejection_reason: reason || null },
+      { new: true, runValidators: false }
+    );
 
     await logActivity(req, {
       action: "DELETE",
@@ -187,7 +212,7 @@ const createVendor = async (req, res) => {
     // Check if email already exists
     const emailExists = await Vendor.findOne({
       email: email.toLowerCase().trim(),
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (emailExists) {
@@ -198,7 +223,7 @@ const createVendor = async (req, res) => {
     // Check if phone number already exists
     const phoneExists = await Vendor.findOne({
       phone_number: phone_number.trim(),
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (phoneExists) {
@@ -341,7 +366,7 @@ const updateVendor = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: id,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -364,7 +389,7 @@ const updateVendor = async (req, res) => {
         const emailExists = await Vendor.findOne({
           email: normalizedEmail,
           _id: { $ne: vendor._id },
-          is_deleted: false,
+          is_deleted: { $ne: true },
         });
 
         if (emailExists) {
@@ -385,7 +410,7 @@ const updateVendor = async (req, res) => {
       const phoneExists = await Vendor.findOne({
         phone_number,
         _id: { $ne: vendor._id },
-        is_deleted: false,
+        is_deleted: { $ne: true },
       });
 
       if (phoneExists) {
@@ -551,7 +576,7 @@ const updateVendorStatus = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: id,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -567,8 +592,15 @@ const updateVendorStatus = async (req, res) => {
 
     // Store old status for comparison
     const oldStatus = vendor.is_active;
-    vendor.is_active = !vendor.is_active;
-    await vendor.save();
+    // FIXED: same findOneAndUpdate fix as approve/reject — .save() was
+    // re-validating the whole document and failing on legacy records
+    // missing required fields the current schema expects.
+    const updatedVendor = await Vendor.findOneAndUpdate(
+      { _id: id, is_deleted: { $ne: true } },
+      { is_active: !vendor.is_active },
+      { new: true, runValidators: false }
+    );
+    Object.assign(vendor, updatedVendor.toObject());
 
     // Determine status for email
     const statusType = vendor.is_active ? 'activated' : 'deactivated';
@@ -642,7 +674,7 @@ const deleteVendor = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: id,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -660,7 +692,13 @@ const deleteVendor = async (req, res) => {
     vendor.is_deleted = true;
     vendor.is_active = false;
     vendor.deleted_at = new Date();
-    await vendor.save();
+    // FIXED: findOneAndUpdate instead of save() — same legacy-data
+    // validation issue as approve/reject.
+    await Vendor.findOneAndUpdate(
+      { _id: id, is_deleted: { $ne: true } },
+      { is_deleted: true, is_active: false, deleted_at: new Date() },
+      { new: true, runValidators: false }
+    );
 
     console.log('✅ Vendor soft deleted:', {
       id: vendor._id,
@@ -738,7 +776,7 @@ const activateVendor = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: id,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -753,9 +791,14 @@ const activateVendor = async (req, res) => {
 
     // Store old status
     const oldStatus = vendor.is_active;
+    // FIXED: findOneAndUpdate instead of save() — same legacy-data fix.
+    await Vendor.findOneAndUpdate(
+      { _id: id, is_deleted: { $ne: true } },
+      { is_active: true, activated_at: new Date() },
+      { new: true, runValidators: false }
+    );
     vendor.is_active = true;
     vendor.activated_at = new Date();
-    await vendor.save();
 
     console.log('✅ Vendor activated:', {
       id: vendor._id,
@@ -814,7 +857,7 @@ const deactivateVendor = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: id,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -829,9 +872,14 @@ const deactivateVendor = async (req, res) => {
 
     // Store old status
     const oldStatus = vendor.is_active;
+    // FIXED: findOneAndUpdate instead of save() — same legacy-data fix.
+    await Vendor.findOneAndUpdate(
+      { _id: id, is_deleted: { $ne: true } },
+      { is_active: false, deactivated_at: new Date() },
+      { new: true, runValidators: false }
+    );
     vendor.is_active = false;
     vendor.deactivated_at = new Date();
-    await vendor.save();
 
     console.log('✅ Vendor deactivated:', {
       id: vendor._id,
@@ -897,7 +945,7 @@ const getVendorServices = async (req, res) => {
     if (type === "event") {
       data = await Event.find({
         vendor_id,
-        is_deleted: false,
+        is_deleted: { $ne: true },
       })
         .populate("category_ids", "category_name")
         .sort({ createdAt: -1 });
@@ -906,7 +954,7 @@ const getVendorServices = async (req, res) => {
     if (type === "venue") {
       data = await Venue.find({
         vendor_id,
-        is_deleted: false,
+        is_deleted: { $ne: true },
       })
         .populate("category_ids", "category_name")
         .sort({ createdAt: -1 });
@@ -934,7 +982,7 @@ const getVendorBookings = async (req, res) => {
     const bookings = await Booking.find({
       vendor_id,
       booking_type: type,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     })
       .populate("user_id", "name email")
       .populate("event_id")
@@ -960,7 +1008,7 @@ const getVendorEarnings = async (req, res) => {
       vendor_id,
       payment_status: "success",
       booking_status: { $ne: "cancelled" },
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     let totalEarnings = 0;
@@ -1008,7 +1056,7 @@ const getBankDetails = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: vendorId,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     }).select('bank_details');
 
     if (!vendor) {
@@ -1059,7 +1107,7 @@ const addBankDetails = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: vendorId,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -1120,7 +1168,7 @@ const editBankDetails = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: vendorId,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {
@@ -1164,7 +1212,7 @@ const deleteBankDetails = async (req, res) => {
 
     const vendor = await Vendor.findOne({
       _id: vendorId,
-      is_deleted: false,
+      is_deleted: { $ne: true },
     });
 
     if (!vendor) {

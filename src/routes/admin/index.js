@@ -35,6 +35,7 @@ import notificationRoute from "./notificationRoute.js"
 import activityLogRoute from "./activityLogRoute.js"
 import supportRequestRoute from "./supportRequestRoute.js"
 import analyticsRoute from "./analyticsRoute.js"
+import adminManagementRoute from "./adminManagementRoute.js"
 
 
 const router = express.Router();
@@ -89,6 +90,7 @@ const routeArray = [
   { path: "/activity-log", route: activityLogRoute },
   { path: "/support-requests", route: supportRequestRoute },
   { path: "/analytics", route: analyticsRoute },
+  { path: "/admins", route: adminManagementRoute },
 ];
 
 routeArray.forEach(({ path, route }) => router.use(path, route));
