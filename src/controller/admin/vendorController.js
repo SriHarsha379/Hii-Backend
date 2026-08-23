@@ -173,7 +173,11 @@ const createVendor = async (req, res) => {
       address,
       landmark,
       password,
-      vendor_type  // NEW: vendor_type field
+      vendor_type,  // NEW: vendor_type field
+      contact_person,
+      description,
+      registration_number,
+      tax_id,
     } = req.body;
 
     console.log('🔨 Creating vendor with data:', {
@@ -243,6 +247,10 @@ const createVendor = async (req, res) => {
       landmark: landmark ? landmark.trim() : "",
       password,
       business_image: req.file ? req.file.filename : "",
+      contact_person: contact_person || "",
+      description: description || "",
+      registration_number: registration_number || "",
+      tax_id: tax_id || "",
     };
 
     console.log('📝 Vendor data to save:', vendorData);
@@ -352,7 +360,7 @@ const createVendor = async (req, res) => {
 const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description } = req.body;
+    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description, registration_number, tax_id } = req.body;
 
     console.log('🔄 Updating vendor:', id);
     console.log('📥 Request body:', req.body);
@@ -475,6 +483,16 @@ const updateVendor = async (req, res) => {
     if (description !== undefined && description !== vendor.description) {
       updates.description = description;
       changes.push(`Description updated`);
+      hasChanges = true;
+    }
+    if (registration_number !== undefined && registration_number !== vendor.registration_number) {
+      updates.registration_number = registration_number;
+      changes.push(`Registration number updated`);
+      hasChanges = true;
+    }
+    if (tax_id !== undefined && tax_id !== vendor.tax_id) {
+      updates.tax_id = tax_id;
+      changes.push(`Tax ID updated`);
       hasChanges = true;
     }
 

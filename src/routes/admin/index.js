@@ -36,6 +36,8 @@ import activityLogRoute from "./activityLogRoute.js"
 import supportRequestRoute from "./supportRequestRoute.js"
 import analyticsRoute from "./analyticsRoute.js"
 import adminManagementRoute from "./adminManagementRoute.js"
+import pollRoute from "./pollRoute.js"
+import contestRoute from "./contestRoute.js"
 
 
 const router = express.Router();
@@ -91,6 +93,8 @@ const routeArray = [
   { path: "/support-requests", route: supportRequestRoute },
   { path: "/analytics", route: analyticsRoute },
   { path: "/admins", route: adminManagementRoute },
+  { path: "/polls", route: pollRoute },
+  { path: "/contests", route: contestRoute },
 ];
 
 routeArray.forEach(({ path, route }) => router.use(path, route));

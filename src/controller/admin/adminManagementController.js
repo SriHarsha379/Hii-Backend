@@ -76,4 +76,78 @@ const createAdmin = async (req, res) => {
   }
 };
 
-export default { getAllAdmins, createAdmin };
+// PATCH /admins/:id/status — toggle active/inactive
+const toggleAdminStatus = async (req, res) => {
+  try {
+    if (req.user?.role !== "SUPER_ADMIN") {
+      return apiResponse.forbidden(res, "Not authorized");
+    }
+    const { id } = req.params;
+    const admin = await Admin.findOne({ _id: id, is_deleted: { $ne: true } });
+    if (!admin) return apiResponse.notFoundResponse(res, "Admin not found");
+
+    if (String(admin._id) === String(req.user._id)) {
+      return apiResponse.badRequest(res, "You can't deactivate your own account");
+    }
+
+    const nextActive = !admin.is_active;
+    const updated = await Admin.findOneAndUpdate(
+      { _id: id },
+      { is_active: nextActive, status: nextActive ? "ACTIVE" : "INACTIVE" },
+      { new: true, runValidators: false }
+    ).select("-password");
+
+    return apiResponse.ok(res, updated, nextActive ? "Admin activated" : "Admin deactivated");
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// DELETE /admins/:id — soft delete
+const deleteAdmin = async (req, res) => {
+  try {
+    if (req.user?.role !== "SUPER_ADMIN") {
+      return apiResponse.forbidden(res, "Not authorized");
+    }
+    const { id } = req.params;
+    const admin = await Admin.findOne({ _id: id, is_deleted: { $ne: true } });
+    if (!admin) return apiResponse.notFoundResponse(res, "Admin not found");
+
+    if (String(admin._id) === String(req.user._id)) {
+      return apiResponse.badRequest(res, "You can't delete your own account");
+    }
+
+    await Admin.findOneAndUpdate(
+      { _id: id },
+      { is_deleted: true, is_active: false, status: "INACTIVE" },
+      { runValidators: false }
+    );
+
+    return apiResponse.ok(res, null, "Admin removed");
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// PATCH /admins/me/avatar — update the logged-in admin's own profile photo
+const updateOwnAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return apiResponse.badRequest(res, "No image file provided");
+    }
+    const updated = await Admin.findOneAndUpdate(
+      { _id: req.user._id, is_deleted: { $ne: true } },
+      { profile_image: req.file.filename },
+      { new: true, runValidators: false }
+    ).select("-password");
+    if (!updated) return apiResponse.notFoundResponse(res, "Admin not found");
+    return apiResponse.ok(res, updated, "Profile photo updated");
+  } catch (err) {
+    console.error(err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+export default { getAllAdmins, createAdmin, toggleAdminStatus, deleteAdmin, updateOwnAvatar };

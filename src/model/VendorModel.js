@@ -71,6 +71,19 @@ const VendorSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Relevant for event_organizer vendors specifically — company
+    // registration/tax identity. Was being collected in the Event Admin
+    // onboarding form but had nowhere to actually save.
+    registration_number: {
+      type: String,
+      default: "",
+    },
+
+    tax_id: {
+      type: String,
+      default: "",
+    },
+
     password: {
       type: String,
       required: true,

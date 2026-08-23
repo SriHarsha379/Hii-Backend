@@ -59,20 +59,34 @@ const sendVendorNotification = async (req, res) => {
 
 const getVendorNotifications = async (req, res) => {
     try {
-        const vendor_id = req.vendor._id;
+        // FIXED: was hardcoded to req.vendor._id — allowAdminOrVendor only
+        // sets req.vendor for vendor-token callers. Every admin caller
+        // (which is literally everyone using this dashboard, since
+        // CLUB_ADMIN/EVENT_ADMIN log in through the Admin collection too)
+        // got req.user instead, so this crashed with "Cannot read
+        // properties of undefined" for every single admin request. The
+        // schema already has separate user_id/vendor_user_id fields for
+        // exactly this distinction — just never branched on it.
+        const isVendorCaller = Boolean(req.vendor);
+        const identityId = isVendorCaller ? req.vendor._id : req.user?._id;
+        const identityField = isVendorCaller ? 'vendor_user_id' : 'user_id';
+
+        if (!identityId) {
+            return apiResponse.badRequest(res, "Could not identify caller");
+        }
+
         const { page, limit } = req.query;
 
         const { limits, offset, pages } = helper.getPagination(page, limit);
-        console.log("+++++++++++++++++++++++++++++", vendor_id)
         // 🔹 Count
         const totalCount = await Notification.countDocuments({
-            vendor_user_id: vendor_id,
+            [identityField]: identityId,
             is_deleted: 0
         });
 
         // 🔹 Fetch
         const notifications = await Notification.find({
-            vendor_user_id: vendor_id,
+            [identityField]: identityId,
             is_deleted: 0
         })
             .sort({ createdAt: -1 })
@@ -82,7 +96,7 @@ const getVendorNotifications = async (req, res) => {
         // 🔹 Mark all as read
         await Notification.updateMany(
             {
-                vendor_user_id: vendor_id,
+                [identityField]: identityId,
                 is_deleted: 0,
                 read_status: 0
             },
@@ -115,14 +129,17 @@ const getVendorNotifications = async (req, res) => {
 
 const getVendorUnreadCount = async (req, res) => {
     try {
-        const vendor_id = req.vendor._id;
+        // Same admin-vs-vendor identity fix as getVendorNotifications above.
+        const isVendorCaller = Boolean(req.vendor);
+        const identityId = isVendorCaller ? req.vendor._id : req.user?._id;
+        const identityField = isVendorCaller ? 'vendor_user_id' : 'user_id';
 
-        if (!vendor_id) {
-            return apiResponse.badRequest(res, "Vendor not found");
+        if (!identityId) {
+            return apiResponse.badRequest(res, "Could not identify caller");
         }
 
         const unreadCount = await Notification.countDocuments({
-            vendor_user_id: vendor_id,
+            [identityField]: identityId,
             is_deleted: 0,
             read_status: 0
         });

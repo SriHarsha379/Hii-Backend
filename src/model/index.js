@@ -45,6 +45,9 @@ import Rating from "./ratingModel.js";
 import UserReport from "./userReportModel.js";
 import Ads from "./adsModel.js"
 import ActivityLog from "./activityLogModel.js"
+import Poll from "./pollModel.js"
+import Contest from "./contestModel.js"
+import ContestParticipant from "./contestParticipantModel.js"
 export {
   // admin model
   Admin,
@@ -65,6 +68,9 @@ export {
   Genre,
   Vendor,
   PendingVendorOtp,
+  Poll,
+  Contest,
+  ContestParticipant,
   Service,
   // app model
   User,
