@@ -1,36 +1,30 @@
 import express from 'express';
-import authController from '../../controller/app/authController.js';
+import authController from '../../controller/admin/authController.js';
 import { validate } from '../../middleware/validate.js';
-import { signupStepOneSchema, signupStepTwoSchema, signupStepThreeSchema } from "../../validation/app/appValidation.js";
+import { adminLoginSchema, changePasswordSchema, forgetPasswordSchema, forgetNewPasswordSchema } from '../../validation/admin/authValidation.js';
+import { adminauth,allowAdminOrVendor, vendorauth } from '../../middleware/authMiddleware.js';
 import upload from '../../middleware/upload.js';
-import { appAuth } from '../../middleware/authMiddleware.js';
-
-
 const route = express.Router();
 route
-    .post("/signup_step_one", upload.single("profile_image"), validate(signupStepOneSchema), authController.signupStepOne)
-    .post("/otp_verify", authController.otpVerify)
-    .post("/resend_otp", authController.resendOtp)
-    .get("/popular_cities", authController.getTopCities)
-    .post("/signup_step_two", appAuth, validate(signupStepTwoSchema), authController.signupStepTwo)
-    .get("/music-genres", appAuth, authController.getMusicGenres)
-    .get("/event-preferences", appAuth, authController.getEventPreferences)
-    .get("/get_vibe_checks", appAuth, authController.getVibeCheckQuestions)
-    .post("/signup_step_three", appAuth, upload.fields([
-        { name: "images", maxCount: 9 },
-        { name: "videos", maxCount: 9 },
-        { name: "thumbnails", maxCount: 9 }
-    ]), validate(signupStepThreeSchema), authController.signupStepThree)
-
-    .post("/resend_email_otp", authController.resendEmailOtp)
-    .post("/verify_email_otp", authController.verifyEmailOtp)
-    .post("/login", authController.login)
-    .post('/forgot_password', authController.forgotPassword)
-    .post('/resend_forgot_otp', authController.resendForgotOtp)
-    .post('/verify_forgot_otp', authController.verifyForgotOtp)
-    .post('/confirm_password', appAuth, authController.changePassword)
-    .post('/social_login', authController.socialLogin)
-    .post('/logout', appAuth, authController.logout)
-    .post("/check_phone_number", authController.checkMobileNumber)
-
+    // Admin login
+    .post('/login', validate(adminLoginSchema), authController.loginAdmin)
+    // NEW: second step of login when 2FA is enabled on the account
+    .post('/verify-2fa', authController.verifyTwoFactorLogin)
+    // NEW: 2FA setup/management for the logged-in admin
+    .post('/2fa/setup', adminauth, authController.beginSetupTwoFactor)
+    .post('/2fa/confirm', adminauth, authController.confirmSetupTwoFactor)
+    .post('/2fa/disable', adminauth, authController.disableTwoFactor)
+    // Update profile
+    .put('/update', adminauth, upload.single("profile_image"), authController.updateAdminProfile)
+    // Get admin details
+    .get("/getDetails", adminauth, authController.getAdminDetails)
+    // Change password
+    .put("/change-password", adminauth, validate(changePasswordSchema), authController.changePassword)
+    // Forget password - send email
+    .post("/forget_password", validate(forgetPasswordSchema), authController.adminForgetPassword)
+    // Forget password - set new password
+    .put("/forget_new_password", validate(forgetNewPasswordSchema), authController.adminForgetNewPassword)
+    // dashboard count
+    .get("/getDashboardCounts", allowAdminOrVendor, authController.dashboardCounts)
+    .get("/getDashboardCountsVendor",vendorauth,authController.dashboardCountsVendor)
 export default route;

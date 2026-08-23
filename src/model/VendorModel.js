@@ -84,6 +84,19 @@ const VendorSchema = new mongoose.Schema(
       default: "",
     },
 
+    // NEW: collected in Event Organiser's profile form (Company Type,
+    // Official Website) but had nowhere to actually save — same gap
+    // registration_number/tax_id had before being added earlier.
+    company_type: {
+      type: String,
+      default: "",
+    },
+
+    website: {
+      type: String,
+      default: "",
+    },
+
     password: {
       type: String,
       required: true,

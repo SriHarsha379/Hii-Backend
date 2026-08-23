@@ -1,1407 +1,642 @@
-import { User, Genre, Event, Category, City, VibeCheckQuestion } from "../../model/index.js";
+/** @format */
+
+import bcrypt from "bcryptjs";
+import jwtt from "../../utility/generateToken.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import helper from "../../utility/helper.js";
-import generateToken from "../../utility/generateToken.js";
-import utility from "../../utility/sendmail.js"
-import sendNotification from "../../utility/notification.js";
-import mailer from "../../utility/sendmail.js"
-import admin from "../../config/firebase_config.js"
+import sendmail from "../../utility/sendmail.js";
+import jwt from "jsonwebtoken";
+import totp from "../../utility/totp.js";
 
-const generateUniqueReferralCode = async () => {
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let referralCode;
-    let isUnique = false;
+import dotenv from "dotenv";
+dotenv.config();
+import { Admin, Booking, Faq, Contact, User, Vendor, Earning, withdraw, Service, Event, Coupon } from "../../model/index.js";
 
-    while (!isUnique) {
-        referralCode = "";
-        for (let i = 0; i < 8; i++) {
-            referralCode += characters.charAt(
-                Math.floor(Math.random() * characters.length)
-            );
-        }
 
-        const existingUser = await User.findOne({
-            my_referral_code: referralCode
-        });
 
-        if (!existingUser) {
-            isUnique = true;
-        }
+// Admin Login
+const loginAdmin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1️⃣ Validate fields
+    if (!email || !password) {
+      return apiResponse.badRequest(res, "Email and password are required");
     }
 
-    return referralCode;
+    // 2️⃣ Check if admin exists
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return apiResponse.unauthorized(res, "Invalid email or password");
+    }
+
+    // 3️⃣ Compare hashed password
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return apiResponse.unauthorized(res, "Invalid email or password");
+    }
+
+    // NEW: if this admin has 2FA enabled, don't issue the real session
+    // token yet — issue a short-lived "pending" token instead (5 minute
+    // expiry, distinct purpose from the real session token so it can't
+    // be used to access anything else) and ask the frontend to collect a
+    // TOTP code, which gets submitted to verifyTwoFactorLogin below.
+    if (admin.two_factor_enabled) {
+      const pendingToken = jwt.sign(
+        { adminId: admin._id, purpose: "2fa_pending" },
+        process.env.JWT_SECRET,
+        { expiresIn: "5m" }
+      );
+      return apiResponse.ok(
+        res,
+        { requires_2fa: true, pending_token: pendingToken },
+        "Enter your two-factor authentication code"
+      );
+    }
+
+    // 4️⃣ Generate JWT
+    const token = jwtt.generateToken(admin._id, "admin");
+
+return apiResponse.ok(
+  res,
+  {
+    token,
+    email: admin.email,
+    _id: admin._id,
+    name: admin.name,
+    role: admin.role,
+    organisation: admin.organisation
+  },
+  "Login successful"
+);
+
+  } catch (err) {
+    return apiResponse.serverError(res, "Server error", err.message);
+  }
 };
 
-
-const signupStepOne = async (req, res) => {
-    try {
-        const {
-            phone_number,
-            first_name,
-            last_name,
-            name,
-            username,
-            email,
-            dob,
-            gender,
-            city_id,
-            referral_code,
-            player_id,
-            device_type,
-            password,
-            login_type,
-            height
-        } = req.body;
-
-        if (!phone_number || !username || !email || !dob || !gender || !city_id) {
-            return apiResponse.badRequest(res, messages.MSG_EMPTY_PARAM);
-        }
-
-        const ageCheck = helper.validateMinimumAge(dob, 18);
-        if (!ageCheck.valid) {
-            return apiResponse.badRequest(
-                res,
-                ageCheck.reason === "underage"
-                    ? messages.AGE_RESTRICTION
-                    : messages.INVALID_DOB
-            );
-        }
-
-        const profileImage = req.file?.filename || null;
-        if (!profileImage) {
-            return apiResponse.badRequest(res, messages.PROFILE_REQ);
-        }
-
-        const cleanPhone = String(phone_number).trim();
-        const cleanUsername = String(username).toLowerCase().trim();
-        const cleanEmail = String(email).toLowerCase().trim();
-
-        /* =====================================================
-           🔹 SOCIAL FLOW (UPDATE EXISTING USER)
-        ===================================================== */
-        if (login_type === "google" || login_type === "apple") {
-
-            const existingSocialUser = await User.findOne({
-                email: cleanEmail,
-                login_type: login_type,
-                is_deleted: false
-            });
-
-            if (!existingSocialUser) {
-                return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-            }
-
-            /* ---------- DUPLICATE CHECKS ---------- */
-
-            const usernameExists = await User.findOne({
-                username: cleanUsername,
-                _id: { $ne: existingSocialUser._id },
-                is_deleted: false
-            });
-
-            if (usernameExists) {
-                return apiResponse.badRequest(res, messages.USERNAME_ALREDY_EXISTS);
-            }
-
-            const phoneExists = await User.findOne({
-                phone_number: cleanPhone,
-                _id: { $ne: existingSocialUser._id },
-                is_deleted: false
-            });
-
-            if (phoneExists) {
-                return apiResponse.badRequest(res, messages.MSG_PHONE_EXISTS);
-            }
-
-            /* ---------- STATIC OTP ---------- */
-            const otpCode = "1234";
-            const otpExpiry = new Date(Date.now() + 30 * 60 * 1000);
-
-            /* ---------- UPDATE USER ---------- */
-
-            existingSocialUser.phone_number = cleanPhone;
-            existingSocialUser.username = cleanUsername;
-            existingSocialUser.first_name = first_name;
-            existingSocialUser.last_name = last_name;
-            existingSocialUser.name = `${first_name} ${last_name}`;
-            existingSocialUser.birthdate = dob;
-            existingSocialUser.gender = gender;
-            existingSocialUser.city_id = city_id;
-            existingSocialUser.profile_image = profileImage;
-            existingSocialUser.referral_code = referral_code || existingSocialUser.referral_code;
-
-            existingSocialUser.otp = {
-                code: otpCode,
-                expires_at: otpExpiry
-            };
-
-            existingSocialUser.signup_step = 1;
-            existingSocialUser.is_profile_completed = false;
-            existingSocialUser.is_verified = false;
-
-            existingSocialUser.device_type = device_type || existingSocialUser.device_type;
-            existingSocialUser.player_id = player_id || existingSocialUser.player_id;
-
-            await existingSocialUser.save();
-
-            const userData = await helper.getUserData(existingSocialUser._id);
-            userData.signup_step = 1;
-            userData.is_new_user = true;
-            userData.otp = otpCode; // 👈 static OTP in response
-
-            return apiResponse.ok(res, userData, messages.MSG_OTP_SENT);
-        }
-
-        /* =====================================================
-           🔹 NORMAL SIGNUP FLOW
-        ===================================================== */
-
-        // Password mandatory in normal flow
-        if (!password) {
-            return apiResponse.badRequest(res, "Password is required");
-        }
-
-        const existingPhoneUser = await User.findOne({
-            phone_number: cleanPhone,
-            is_deleted: false
-        });
-
-        const deletedPhoneUser = await User.findOne({
-            phone_number: cleanPhone,
-            is_deleted: true
-        });
-
-        if (existingPhoneUser && existingPhoneUser.is_verified) {
-            return apiResponse.badRequest(res, messages.MSG_PHONE_EXISTS);
-        }
-
-        // if (deletedPhoneUser) {
-        //     return apiResponse.badRequest(res, "Phone number belongs to a deleted account. Please use a different number.");
-        // }
-
-        const usernameExists = await User.findOne({
-            username: cleanUsername,
-            is_deleted: false
-        });
-
-        if (usernameExists && usernameExists.is_verified) {
-            return apiResponse.badRequest(res, messages.USERNAME_ALREDY_EXISTS);
-        }
-
-        const emailExists = await User.findOne({
-            email: cleanEmail,
-            is_deleted: false
-        });
-
-        const deletedEmailUser = await User.findOne({
-            email: cleanEmail,
-            is_deleted: true
-        });
-
-        if (emailExists && emailExists.is_verified) {
-            return apiResponse.badRequest(res, messages.EMAIL_ALREADY_EXISTS);
-        }
-
-        // if (deletedEmailUser) {
-        //     return apiResponse.badRequest(res, "Email belongs to a deleted account. Please use a different email.");
-        // }
-
-        const otpCode = "1234";
-        const otpExpiry = new Date(Date.now() + 30 * 60 * 1000);
-
-        const user = await User.create({
-            phone_number: cleanPhone,
-            username: cleanUsername,
-            email: cleanEmail,
-            password,
-            profile_image: profileImage,
-            first_name,
-            last_name,
-            name: `${first_name} ${last_name || ""}`.trim(),
-            birthdate: dob,
-            gender,
-            height,
-            city_id,
-            referral_code: referral_code || null,
-            player_id: player_id || null,
-            device_type: device_type || null,
-            otp: {
-                code: otpCode,
-                expires_at: otpExpiry
-            },
-            signup_step: 1,
-            is_profile_completed: false,
-            is_verified: false
-        });
-
-        const userData = await helper.getUserData(user._id);
-        userData.signup_step = 1;
-        userData.is_new_user = true;
-        userData.otp = otpCode;
-
-        return apiResponse.ok(res, userData, messages.MSG_OTP_SENT);
-
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
+// NEW: second step of login when 2FA is enabled — takes the pending
+// token from loginAdmin above plus the 6-digit code from the admin's
+// authenticator app, and issues the real session token on success.
+const verifyTwoFactorLogin = async (req, res) => {
+  try {
+    const { pending_token, code } = req.body;
+    if (!pending_token || !code) {
+      return apiResponse.badRequest(res, "Pending token and code are required");
     }
-};
 
-// ---------- OTP VERIFY (SINGLE API)
-const otpVerify = async (req, res) => {
+    let decoded;
     try {
-        const { phone_number, firebase_id_token } = req.body;
-        if (!phone_number || !firebase_id_token) {
-            return apiResponse.badRequest(
-                res,
-                messages.ALL_FIELDS_REQUIRED
-            );
-        }
-        const cleanPhoneNumber = String(phone_number).trim();
-        /* ================= VERIFY FIREBASE ID TOKEN ================= */
-        let decodedToken;
-        try {
-            decodedToken = await admin.auth().verifyIdToken(firebase_id_token);
-        } catch (firebaseError) {
-            console.error("FIREBASE VERIFY ERROR:", firebaseError.code, firebaseError.message);
-            // TEMP DEBUG — remove after diagnosing
-            return apiResponse.badRequest(res, `DEBUG: Firebase verify failed - ${firebaseError.code} - ${firebaseError.message}`);
-        }
-        // Ensure the verified phone number matches the one being signed up
-        const verifiedFirebasePhone = decodedToken.phone_number || '';
-        const normalizedVerified = verifiedFirebasePhone.replace(/\D/g, '').slice(-10);
-        const normalizedRequested = cleanPhoneNumber.replace(/\D/g, '').slice(-10);
-        console.log("PHONE CHECK:", { verifiedFirebasePhone, normalizedVerified, normalizedRequested });
-        if (!normalizedVerified || normalizedVerified !== normalizedRequested) {
-            // TEMP DEBUG — remove after diagnosing
-            return apiResponse.badRequest(res, `DEBUG: Phone mismatch - verified="${verifiedFirebasePhone}" requested="${cleanPhoneNumber}"`);
-        }
-        /* ================= FIND USER ================= */
-        const user = await User.findOne({
-            phone_number: cleanPhoneNumber,
-            is_deleted: false
-        });
-        if (!user)
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-        /* ================= GENERATE REFERRAL CODE ================= */
-        if (!user.my_referral_code) {
-            const referralCode = await generateUniqueReferralCode();
-            user.my_referral_code = referralCode;
-        }
-        /* ================= UPDATE USER ================= */
-        user.is_verified = true;
-        user.otp = null;
-        await user.save();
-        /* ================= TOKEN ================= */
-        const token = generateToken.generateToken(user._id);
-        const userData = await helper.getUserData(user._id);
-        userData.token = token;
-        userData.is_new_user = !user.is_profile_completed;
-        return apiResponse.ok(
-            res,
-            userData,
-            messages.OTP_VERIFIED
-        );
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
-};
-
-// ------------------- RESEND OTP -------------------
-const resendOtp = async (req, res) => {
-    try {
-        const { phone_number } = req.body
-
-        const cleanPhoneNumber = String(phone_number).trim()
-
-        const user = await User.findOne({
-            phone_number: cleanPhoneNumber,
-            is_deleted: false
-        })
-
-        if (!user) return apiResponse.badRequest(res, messages.USER_NOT_FOUND)
-
-        const otp = '1234'
-        const expires_at = new Date(Date.now() + 60 * 60 * 1000)
-
-        await User.updateOne(
-            { phone_number: cleanPhoneNumber },
-            { $set: { otp: { code: otp, expires_at }, updatedAt: Date.now() } }
-        )
-
-        return apiResponse.ok(res, { otp }, messages.MSG_OTP_SENT)
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message)
-    }
-}
-
-
-// ---------- GET ALL CITIES (USING POPULATE)
-const getTopCities = async (req, res) => {
-    try {
-        const cities = await City.find(
-            {
-                is_active: true,
-                is_deleted: false
-            },
-            {
-                city_name: 1,
-                latitude: 1,
-                longitude: 1,
-                city_image: 1
-            }
-        )
-            .populate("state_id", "_id") // populate used (safe, optional fields)
-            .lean();
-
-        const response = cities.map(city => ({
-            _id: city._id,
-            city_name: city.city_name,
-            latitude: city.latitude,
-            longitude: city.longitude,
-            city_image: city.city_image,
-            user_count: 0 // SAME KEY as Top Cities API
-        }));
-
-        return apiResponse.ok(res, response, messages.DATA_FOUND);
+      decoded = jwt.verify(pending_token, process.env.JWT_SECRET);
     } catch (err) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+      return apiResponse.badRequest(res, "Session expired, please log in again");
     }
+    if (decoded.purpose !== "2fa_pending") {
+      return apiResponse.badRequest(res, "Invalid session");
+    }
+
+    const admin = await Admin.findById(decoded.adminId);
+    if (!admin || !admin.two_factor_enabled || !admin.two_factor_secret) {
+      return apiResponse.badRequest(res, "Two-factor authentication is not active on this account");
+    }
+
+    const isValidCode = totp.verifyCode(admin.two_factor_secret, code);
+    if (!isValidCode) {
+      return apiResponse.unauthorized(res, "Invalid or expired code");
+    }
+
+    const token = jwtt.generateToken(admin._id, "admin");
+    return apiResponse.ok(
+      res,
+      {
+        token,
+        email: admin.email,
+        _id: admin._id,
+        name: admin.name,
+        role: admin.role,
+        organisation: admin.organisation
+      },
+      "Login successful"
+    );
+  } catch (err) {
+    return apiResponse.serverError(res, "Server error", err.message);
+  }
 };
 
-// ---------- SIGNUP – STEP 2
-const signupStepTwo = async (req, res) => {
-    try {
-        const userId = req.userId;
+// NEW: begins 2FA setup for the logged-in admin — generates a fresh
+// secret and returns it for manual entry into an authenticator app
+// (Google Authenticator, Authy, etc. all support typing a secret in
+// directly, no QR code needed). Doesn't enable 2FA yet — the secret is
+// only saved once confirmSetupTwoFactor verifies the admin can actually
+// generate a valid code with it, proving they set it up correctly.
+const beginSetupTwoFactor = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const admin = await Admin.findById(adminId);
+    if (!admin) return apiResponse.notFound(res, messages.NOT_FOUND[0]);
 
-        const {
-            preferred_cities,
-            bio,
-            instagram_account,
-            spotify_account,
-            snapchat_account,
-            hobbies
-        } = req.body;
+    const secret = totp.generateSecret();
+    const otpauthUri = totp.buildOtpAuthUri(secret, admin.email);
 
-        const user = await User.findOne({
-            _id: userId,
-            is_deleted: false
-        });
+    // Stash the pending (not-yet-confirmed) secret so confirmSetupTwoFactor
+    // can verify against it. Not marking two_factor_enabled until confirmed.
+    admin.two_factor_secret = secret;
+    await admin.save();
 
-        if (!user)
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-
-        /* ================= UPDATE STEP 2 DATA ================= */
-
-        // preferred cities (array of objects)
-        if (preferred_cities !== undefined) {
-            user.preferred_cities = preferred_cities;
-        }
-
-
-        // optional fields
-        if (bio !== undefined) user.bio = bio;
-        if (instagram_account !== undefined)
-            user.instagram_account = instagram_account;
-        if (spotify_account !== undefined)
-            user.spotify_account = spotify_account;
-        if (snapchat_account !== undefined)
-            user.snapchat_account = snapchat_account;
-
-        // hobbies (optional array of strings)
-        if (hobbies !== undefined) {
-            user.hobbies = hobbies;
-        }
-
-        user.signup_step = 2;
-
-        await user.save();
-
-        /* ================= TOKEN ================= */
-        const token = generateToken.generateToken(user._id);
-        const userData = await helper.getUserData(user._id);
-
-        userData.token = token;
-
-        return apiResponse.ok(
-            res,
-            userData,
-            messages.DATA_ADDED
-        );
-
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
+    return apiResponse.ok(res, { secret, otpauth_uri: otpauthUri }, "Scan or enter this secret in your authenticator app");
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
 };
 
-// ---------- GET MUSIC GENRES
-const getMusicGenres = async (req, res) => {
-    try {
-        const genres = await Genre.find({
-            is_active: true,
-            is_deleted: false
-        }).select("_id name image category");
+// NEW: confirms setup by checking a real code from the authenticator app
+// against the pending secret, then flips two_factor_enabled on.
+const confirmSetupTwoFactor = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const { code } = req.body;
+    if (!code) return apiResponse.badRequest(res, "Verification code is required");
 
-        return apiResponse.ok(
-            res,
-            genres,
-            messages.DATA_FOUND
-        );
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
+    const admin = await Admin.findById(adminId);
+    if (!admin) return apiResponse.notFound(res, messages.NOT_FOUND[0]);
+    if (!admin.two_factor_secret) {
+      return apiResponse.badRequest(res, "Start setup first");
     }
+
+    const isValidCode = totp.verifyCode(admin.two_factor_secret, code);
+    if (!isValidCode) {
+      return apiResponse.unauthorized(res, "Invalid code — check your authenticator app and try again");
+    }
+
+    admin.two_factor_enabled = true;
+    await admin.save();
+
+    return apiResponse.ok(res, { two_factor_enabled: true }, "Two-factor authentication enabled");
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
 };
 
-// ---------- GET EVENT PREFERENCES
-const getEventPreferences = async (req, res) => {
-    try {
-        const events = await Category.find({
-            is_active: true,
-            is_deleted: false,
-            category_type: 1
-        }).select("_id category_name");
+// NEW: disables 2FA — requires the current password as confirmation,
+// same as changing a password, since this is a real security-relevant
+// action.
+const disableTwoFactor = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const { password } = req.body;
+    if (!password) return apiResponse.badRequest(res, "Password is required to disable two-factor authentication");
 
-        return apiResponse.ok(
-            res,
-            events,
-            messages.DATA_FOUND
-        );
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
-};
+    const admin = await Admin.findById(adminId);
+    if (!admin) return apiResponse.notFound(res, messages.NOT_FOUND[0]);
 
-// ---------- GET VIBE CHECK QUESTIONS
-const getVibeCheckQuestions = async (req, res) => {
-    try {
-        const questions = await VibeCheckQuestion.find(
-            {
-                is_active: true,
-                is_deleted: false
-            },
-            {
-                question: 1,
-                description: 1
-            }
-        )
-            .sort({ createdAt: -1 }) // 👈 latest first
-            .lean();
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) return apiResponse.unauthorized(res, "Incorrect password");
 
-        return apiResponse.ok(
-            res,
-            questions,
-            messages.DATA_FOUND
-        );
+    admin.two_factor_enabled = false;
+    admin.two_factor_secret = null;
+    await admin.save();
 
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
-};
-
-// ---------- SIGNUP – STEP 3
-const signupStepThree = async (req, res) => {
-    try {
-        const user = await User.findOne({ _id: req.userId, is_deleted: false });
-        if (!user) return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-
-        const {
-            music_genre,
-            custom_music_genres,
-            event_preferences,
-            custom_event_preferences,
-            vibes,
-            custom_vibes,
-            vibe_checks,
-            sexuality,
-            interested_in,
-            pronouns,
-            another_email
-        } = req.body;
-
-
-        // ✅ Fix for FormData vibe_checks
-        let parsedVibeChecks = [];
-        if (vibe_checks && typeof vibe_checks === "string") {
-            try {
-                parsedVibeChecks = JSON.parse(vibe_checks);
-            } catch (e) {
-                parsedVibeChecks = [];
-            }
-        } else if (Array.isArray(vibe_checks)) {
-            parsedVibeChecks = vibe_checks;
-        }
-
-        // 👇 USE PARSED VALUE
-        const vibeChecksArr = parsedVibeChecks;
-
-        /* ================= HELPERS ================= */
-
-        const toArray = (v) => {
-            if (!v) return [];
-            if (Array.isArray(v)) return v;
-            if (typeof v === "string") {
-                return v
-                    .split(",")
-                    .map(i => i.trim())
-                    .filter(Boolean);
-            }
-            return [];
-        };
-
-        /* ================= PARSE VALUES ================= */
-
-        const musicGenreArr = toArray(music_genre);
-        const customMusicArr = toArray(custom_music_genres);
-
-        const eventPrefArr = toArray(event_preferences);
-        const customEventArr = toArray(custom_event_preferences);
-
-        const customVibesArr = toArray(custom_vibes);
-
-        /* ================= VALIDATIONS ================= */
-
-        if (musicGenreArr.length === 0 && customMusicArr.length === 0) {
-            return apiResponse.badRequest(
-                res,
-                "Please select at least one music genre or add custom music genre"
-            );
-        }
-
-        if (eventPrefArr.length === 0 && customEventArr.length === 0) {
-            return apiResponse.badRequest(
-                res,
-                "Please select at least one event preference or add custom event preference"
-            );
-        }
-
-        // The curated vibe picker was removed - members now only add
-        // free-text vibes, so this validation only checks custom_vibes.
-        if (customVibesArr.length === 0) {
-            return apiResponse.badRequest(
-                res,
-                "Please add at least one vibe"
-            );
-        }
-
-        /* ================= SAVE STEP 3 DATA ================= */
-
-        user.music_genre = musicGenreArr;
-        user.custom_music_genres = customMusicArr;
-
-        user.event_preferences = eventPrefArr;
-        user.custom_event_preferences = customEventArr;
-
-        user.custom_vibes = customVibesArr;
-
-        // ✅ save structured vibe checks (ONLY id + answer)
-        user.vibe_checks = vibeChecksArr.map(vc => ({
-            question_id: vc.question_id || null,
-            answer: vc.answer || null
-        }));
-
-        user.sexuality = sexuality;
-        user.interested_in = interested_in;
-        user.pronouns = pronouns || null;
-
-        /* ================= HANDLE GALLERY ================= */
-
-        const images = req.files?.images || [];
-        const videos = req.files?.videos || [];
-        const thumbnails = req.files?.thumbnails || [];
-
-        if (videos.length > thumbnails.length) {
-            return apiResponse.badRequest(
-                res,
-                "Each video must have a corresponding thumbnail"
-            );
-        }
-
-        if (images.length + videos.length > 9) {
-            return apiResponse.badRequest(
-                res,
-                "Maximum 9 files allowed in total"
-            );
-        }
-
-        const gallery = [];
-
-        for (const img of images) {
-            gallery.push({ url: img.filename, type: "image" });
-        }
-
-        for (let i = 0; i < videos.length; i++) {
-            gallery.push({
-                url: videos[i].filename,
-                type: "video",
-                thumbnail_url: thumbnails[i]?.filename || null
-            });
-        }
-
-        user.user_gallery = gallery;
-        user.signup_step = 3;
-
-        /* ================= OPTIONAL EMAIL ================= */
-
-        if (another_email) {
-
-            const cleanEmail = String(another_email).toLowerCase().trim();
-
-            const emailExists = await User.findOne({
-                another_email: cleanEmail,
-                _id: { $ne: user._id },
-                is_deleted: false
-            });
-
-            if (emailExists) {
-                return apiResponse.badRequest(res, messages.EMAIL_ALREADY_EXISTS);
-            }
-
-            const emailOtp = Math.floor(1000 + Math.random() * 9000).toString();
-
-            // ✅ SAVE EMAIL + OTP FIRST
-            user.another_email = cleanEmail;
-            user.email_otp = {
-                code: emailOtp,
-                expires_at: new Date(Date.now() + 30 * 60 * 1000)
-            };
-            user.is_profile_completed = false;
-            user.signup_step = 3;
-
-            await user.save();   // 🔥 SAVE BEFORE SENDING MAIL
-
-            /* ================= SEND EMAIL ================= */
-
-            const postData = {
-                app_name: process.env.APP_NAME || "YourApp",
-                app_logo: process.env.APP_LOGO || "https://yourdomain.com/logo.png",
-                name: user.full_name || "User",
-                otp: emailOtp
-            };
-
-            const subject = `${postData.app_name} - Email Verification OTP`;
-
-            const mailBody = mailer.mailBodyEmailOtp(postData);
-
-            await mailer.sendMail(cleanEmail, subject, mailBody);
-
-            return apiResponse.ok(
-                res,
-                { email: cleanEmail },
-                messages.MSG_OTP_SENT
-            );
-        }
-
-        /* ================= FINALIZE ================= */
-
-        user.is_profile_completed = true;
-        user.is_another_email_verify = false;
-        await user.save();
-
-        if (user.player_id) {
-            await sendNotification(
-                "welcome",
-                user.player_id,
-                { senderId: user._id, other_user_id: user._id, action: "welcome" },
-                0
-            );
-        }
-
-        // Record the 80% baseline silently — the "welcome" notification
-        // above already covers this milestone, so we don't want a
-        // duplicate "profile completion" ping right after signup.
-        // Fire-and-forget so it can't slow down or break this response.
-        if (typeof helper.checkAndNotifyProfileCompletion === 'function') {
-            helper.checkAndNotifyProfileCompletion(user._id, { silent: true }).catch(() => {});
-        }
-
-        const token = generateToken.generateToken(user._id);
-        const userData = await helper.getUserData(user._id);
-        userData.token = token;
-
-        return apiResponse.ok(res, userData, messages.SIGNUP_SUCCESS);
-
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
+    return apiResponse.ok(res, { two_factor_enabled: false }, "Two-factor authentication disabled");
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
 };
 
 
-// ---------- RESEND EMAIL OTP
-const resendEmailOtp = async (req, res) => {
-    try {
-        const { another_email } = req.body;
+// Get Admin Details
+const getAdminDetails = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    console.log("Admin ID:", adminId); // Debug log
+    const admin = await Admin.findById(adminId).select("-password");
 
-        if (!another_email) {
-            return apiResponse.badRequest(res, "Another email is required");
-        }
+    if (!admin) return apiResponse.notFound(res, messages.NOT_FOUND[0]);
 
-        const cleanEmail = String(another_email).toLowerCase().trim();
+    return apiResponse.ok(res, admin, messages.SUCCESS[0]);
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR[0], err.message);
+  }
+};
+// Admin Update Profile
+const updateAdminProfile = async (req, res) => {
+  try {
+    const adminId = req.user.id; // assuming authMiddleware sets req.user
+    const { email, name } = req.body;
 
-        const user = await User.findOne({
-            another_email: cleanEmail,
-            is_deleted: false
-        });
+    const data = await Admin.findById(adminId);
+    if (!data) return apiResponse.notFound(res, messages.NOT_FOUND);
 
-        if (!user) {
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-        }
+    const updateData = {};
 
-        // 🔐 Generate New OTP
-        const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
-
-        user.email_otp = {
-            code: newOtp,
-            expires_at: new Date(Date.now() + 30 * 60 * 1000) // 30 mins
-        };
-
-        await user.save();
-
-        /* ================= SEND EMAIL ================= */
-
-        const postData = {
-            app_name: process.env.APP_NAME || "YourApp",
-            app_logo: process.env.APP_LOGO || "https://yourdomain.com/logo.png",
-            name: user.full_name || "User",
-            otp: newOtp
-        };
-
-        const subject = `${postData.app_name} - Email Verification OTP`;
-
-        const mailBody = mailer.mailBodyEmailOtp(postData);
-
-        const mailResponse = await mailer.sendMail(cleanEmail, subject, mailBody);
-
-        if (!mailResponse.success) {
-            return apiResponse.serverError(
-                res,
-                "Failed to send OTP email",
-                mailResponse.error
-            );
-        }
-
-        return apiResponse.ok(
-            res,
-            { email: cleanEmail },
-            messages.MSG_OTP_SENT
-        );
-
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
+    // ✅ Email Validation (strict format only)
+    if (email && email !== data.email) {
+      const emailRegex = /^[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(email)) {
+        return apiResponse.badRequest(res, messages.INVALID_EMAIL[0]);
+      }
+      updateData.email = email;
     }
+
+    if (name && name !== data.name) updateData.name = name;
+
+    // ✅ Image comparison
+    if (req.file) {
+      if (data.profile_image !== req.file.filename) {
+        if (data.profile_image) {
+          helper.removeOldImage(data.profile_image);
+        }
+        updateData.profile_image = req.file.filename;
+      }
+    }
+
+    // ✅ Check if nothing to update
+    if (Object.keys(updateData).length === 0) {
+      return apiResponse.ok(res, data, messages.ALREADY_EXIST[0]);
+    }
+
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+      adminId,
+      { $set: updateData },
+      { new: true }
+    ).select("-password");
+
+    return apiResponse.ok(res, updatedAdmin, messages.PROFILE_UPDATED);
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
 };
 
-// ---------- EMAIL OTP VERIFY
-const verifyEmailOtp = async (req, res) => {
-    try {
-        const { another_email, otp } = req.body;
-
-        const cleanEmail = String(another_email).toLowerCase().trim();
-
-        const user = await User.findOne({ another_email: cleanEmail, is_deleted: false });
-        if (!user) return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-
-        if (!user.email_otp || user.email_otp.code !== otp)
-            return apiResponse.badRequest(res, messages.WRONG_OTP);
-
-        if (user.email_otp.expires_at < new Date())
-            return apiResponse.badRequest(res, messages.OTP_EXPIRED);
-
-        user.is_another_email_verify = true;
-        user.email_otp = null;
-        user.is_profile_completed = true;
-        await user.save();
-
-        // 🔔 WELCOME NOTIFICATION
-        if (user.player_id) {
-            await sendNotification(
-                "welcome",
-                user.player_id,
-                {
-                    senderId: user._id,
-                    other_user_id: user._id,
-                    action: "welcome"
-                },
-                0
-            );
-        }
-
-        // Record the 80% baseline silently — same reasoning as
-        // signupStepThree: "welcome" already covers this milestone, so
-        // avoid a duplicate "profile completion" notification.
-        if (typeof helper.checkAndNotifyProfileCompletion === 'function') {
-            helper.checkAndNotifyProfileCompletion(user._id, { silent: true }).catch(() => {});
-        }
-
-        const token = generateToken.generateToken(user._id);
-        const userData = await helper.getUserData(user._id);
-        userData.token = token;
-
-        return apiResponse.ok(res, userData, messages.SIGNUP_SUCCESS);
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
-    }
-};
-
-
-// ---------- LOGIN (EMAIL OR USERNAME + PASSWORD)
-const login = async (req, res) => {
-    try {
-        const { email, password, device_type, player_id } = req.body;
-
-        if (!email || !password || !device_type || !player_id) {
-            return apiResponse.badRequest(
-                res,
-                messages.ALL_FIELDS_REQUIRED
-            );
-        }
-
-        const loginValue = String(email).toLowerCase().trim();
-
-        /* ================= FIND USER ================= */
-        const user = await User.findOne({
-            is_deleted: false,
-            $or: [
-                { email: loginValue },
-                { username: loginValue },
-                { phone_number: loginValue }
-            ]
-        });
-
-        if (!user) {
-            return apiResponse.badRequest(
-                res,
-                messages.USER_NOT_FOUND
-            );
-        }
-
-        /* ================= PASSWORD CHECK ================= */
-        const isPasswordMatch = await helper.comparePassword(
-            password,
-            user.password
-        );
-
-        if (!isPasswordMatch) {
-            return apiResponse.badRequest(
-                res,
-                messages.WRONG_PASS
-            );
-        }
-
-        /* ================= UPDATE DEVICE INFO ================= */
-        user.device_type = device_type;
-        user.player_id = player_id;
-        await user.save();
-
-        /* =====================================================
-           CHECK ANOTHER EMAIL VERIFICATION
-        ====================================================== */
-
-        if (user.another_email && !user.is_another_email_verify) {
-
-            const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-            const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-
-            user.email_otp.code = otpCode;
-            user.email_otp.expires_at = otpExpiry;
-            user.is_another_email_otp = true;
-            await user.save();
-
-            /* ================= SEND EMAIL ================= */
-            const mailBody = utility.mailBodyEmailOtp({
-                app_name: process.env.APP_NAME,
-                app_logo: process.env.APP_LOGO,
-                name: user.name || user.username || "User",
-                otp: otpCode
-            });
-
-            await utility.sendMail(
-                user.another_email,
-                "Verify Your Email",
-                mailBody
-            );
-
-            /* ================= GET FULL USER DATA ================= */
-            const token = generateToken.generateToken(user._id);
-            const userData = await helper.getUserData(user._id);
-
-            userData.token = token;
-            userData.device_type = device_type;
-            userData.player_id = player_id;
-            userData.is_new_user = !user.is_profile_completed;
-
-            userData.another_email = user.another_email;
-
-            return apiResponse.ok(
-                res,
-                userData,
-                messages.MSG_OTP_SENT
-            );
-        }
-
-        /* ================= TOKEN ================= */
-        const token = generateToken.generateToken(user._id);
-        const userData = await helper.getUserData(user._id);
-
-        userData.device_type = device_type;
-        userData.player_id = player_id;
-        userData.token = token;
-        userData.is_new_user = !user.is_profile_completed;
-
-        return apiResponse.ok(
-            res,
-            userData,
-            messages.LOGIN_SUCCESSFUL
-        );
-
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
-};
-
-
-// ---------- FORGOT PASSWORD (SEND OTP)
-const forgotPassword = async (req, res) => {
-    try {
-        const { email, phone_number } = req.body;
-
-        if (!email && !phone_number) {
-            return apiResponse.badRequest(res, messages.ALL_FIELDS_REQUIRED);
-        }
-
-        const query = email
-            ? { email: String(email).toLowerCase().trim(), is_deleted: false }
-            : { phone_number: String(phone_number).trim(), is_deleted: false };
-
-        const user = await User.findOne(query);
-
-        if (!user)
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-
-        const otpCode = Math.floor(1000 + Math.random() * 9000).toString(); // real random 4-digit OTP
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-
-        user.forget_otp = otpCode;
-        user.is_forget_otp = true;
-        user.expiry_time_otp = otpExpiry;
-        await user.save();
-
-        /* ================= SEND OTP ON EMAIL ================= */
-        if (email) {
-            const mailBody = utility.mailBodyEmailOtp({
-                app_name: process.env.APP_NAME,
-                app_logo: process.env.APP_LOGO,
-                name: user.name || user.username || "User",
-                otp: otpCode
-            });
-
-            await utility.sendMail(
-                user.email,
-                "Forgot Password - OTP Verification",
-                mailBody
-            );
-        }
-
-        // (Optional) If phone_number → later integrate SMS here
-
-        return apiResponse.ok(
-            res,
-            {
-                type: email ? "email" : "phone"
-            },
-            messages.MSG_OTP_SENT
-        );
-
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
-    }
-};
-
-
-// ---------- VERIFY FORGOT OTP
-const verifyForgotOtp = async (req, res) => {
-    try {
-        const { email, phone_number, otp } = req.body;
-
-        if ((!email && !phone_number) || !otp) {
-            return apiResponse.badRequest(res, messages.ALL_FIELDS_REQUIRED);
-        }
-
-        const query = email
-            ? { email: String(email).toLowerCase().trim(), is_deleted: false }
-            : { phone_number: String(phone_number).trim(), is_deleted: false };
-
-        const user = await User.findOne(query);
-
-        if (!user)
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-
-        if (!user.is_forget_otp)
-            return apiResponse.badRequest(res, messages.OTP_NOT_REQUESTED);
-
-        if (user.forget_otp !== otp)
-            return apiResponse.badRequest(res, messages.WRONG_OTP);
-
-        if (user.expiry_time_otp < new Date())
-            return apiResponse.badRequest(res, messages.OTP_EXPIRED);
-
-        // OPTIONAL: Clear OTP after verification
-        user.forget_otp = null;
-        user.is_forget_otp = false;
-        user.expiry_time_otp = null;
-        await user.save();
-
-        /* ================= TOKEN ================= */
-        const token = generateToken.generateToken(user._id);
-        const userData = await helper.getUserData(user._id);
-
-        userData.token = token;
-
-        return apiResponse.ok(res, userData, messages.OTP_VERIFIED);
-
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
-    }
-};
-
-
-// ---------- RESEND FORGOT OTP
-const resendForgotOtp = async (req, res) => {
-    try {
-        const { email, phone_number } = req.body;
-
-        if (!email && !phone_number) {
-            return apiResponse.badRequest(res, messages.ALL_FIELDS_REQUIRED);
-        }
-
-        const query = email
-            ? { email: String(email).toLowerCase().trim(), is_deleted: false }
-            : { phone_number: String(phone_number).trim(), is_deleted: false };
-
-        const user = await User.findOne(query);
-
-        if (!user)
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-
-        const otpCode = "5678"; // STATIC RESEND OTP
-        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-
-        user.forget_otp = otpCode;
-        user.is_forget_otp = true;
-        user.expiry_time_otp = otpExpiry;
-        await user.save();
-
-        /* ================= SEND EMAIL ================= */
-        if (email) {
-            const mailBody = utility.mailBodyEmailOtp({
-                app_name: process.env.APP_NAME,
-                app_logo: process.env.APP_LOGO,
-                name: user.name || user.username || "User",
-                otp: otpCode
-            });
-
-            await utility.sendMail(
-                user.email,
-                "Resend OTP - Forgot Password",
-                mailBody
-            );
-        }
-
-        return apiResponse.ok(
-            res,
-            {
-                type: email ? "email" : "phone",
-                otp: otpCode
-            },
-            messages.MSG_OTP_SENT
-        );
-
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
-    }
-};
-
-
-// ---------- CHANGE PASSWORD (FORGOT PASSWORD - TOKEN BASED)
 const changePassword = async (req, res) => {
-    try {
-        const { new_password } = req.body;
-        const userId = req.userId; // coming from token
+  try {
+    const adminId = req.user.id; // authMiddleware
+    const { oldPassword, newPassword } = req.body;
+    // Get admin from DB
+    const admin = await Admin.findById(adminId);
+    if (!admin) return apiResponse.notFound(res, messages.NOT_FOUND);
 
-        if (!new_password) {
-            return apiResponse.badRequest(
-                res,
-                messages.PASSWORD_REQUIRED
-            );
-        }
-
-        /* ================= FIND USER ================= */
-        const user = await User.findOne({
-            _id: userId,
-            is_deleted: false
-        });
-
-        if (!user) {
-            return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
-        }
-
-        /* ================= CHECK SAME PASSWORD ================= */
-        const isSamePassword = await user.comparePassword(new_password);
-
-        if (isSamePassword) {
-            return apiResponse.badRequest(
-                res,
-                messages.NEW_PASSWORD_SAME_AS_OLD
-            );
-        }
-
-        /* ================= UPDATE PASSWORD ================= */
-        user.password = new_password; // auto-hashed via pre-save
-        user.forget_otp = null;
-        user.is_forget_otp = false;
-        user.expiry_time_otp = null;
-
-        await user.save();
-
-        return apiResponse.ok(
-            res,
-            {},
-            messages.PASSWORD_CHANGED
-        );
-
-    } catch (error) {
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
+    const isMatch = await bcrypt.compare(oldPassword, admin.password);
+    if (!isMatch) return apiResponse.unauthorized(res, messages.WRONG_PASS);
+    // Check if new password is same as old
+    const isSame = await bcrypt.compare(newPassword, admin.password);
+    if (isSame) {
+      return apiResponse.badRequest(res, messages.NEW_PASSWORD_SAME_AS_OLD);
     }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in DB
+    admin.password = hashedPassword;
+    await admin.save();
+
+    return apiResponse.ok(res, messages.PASSWORD_CHANGED);
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// ✅ Admin Forget Password
+const adminForgetPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // 1. Admin check
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return apiResponse.badRequest(res, messages.ADMIN_NOT_FOUND);
+    }
+
+    admin.reset_token_used = false;
+    await admin.save();
+
+    // 2. Create JWT Token (15 min expiry)
+    const token = jwt.sign({ adminId: admin._id }, process.env.JWT_SECRET, {
+      expiresIn: "15m",
+    });
+
+    // 3. Reset link
+    // const resetLink = `https://hii.life/app/admin/reset-password/${token}`;
+    const resetLink = `http://localhost:3000/app/admin/reset-password/${token}`;
+
+    // 4. Prepare email body
+    const mailBody = sendmail.mailBodyForgetPassword({
+      app_name: "Hii Admin",
+      app_logo:
+        "https://hii.life/app/server/uploads/hii_dark_logo.png",
+      adminName: admin.name,
+      adminEmail: admin.email,
+      resetLink,
+    });
+
+    // 5. Send email
+    await sendmail.ForgetPasswordMail(
+      admin.email,
+      "Reset Your Password",
+      mailBody
+    );
+
+    return apiResponse.ok(res, messages.FORGET_PASSWORD_MAIL_SUCCESSFYLLY);
+  } catch (err) {
+    console.error("Forget password error:", err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// ✅ Admin Forget New Password
+const adminForgetNewPassword = async (req, res) => {
+  try {
+    const { newPassword, token } = req.body;
+
+    // 1️⃣ Verify JWT
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return apiResponse.badRequest(res, "Token expired or invalid");
+    }
+
+    // 2️⃣ Find admin
+    const admin = await Admin.findById(decoded.adminId);
+    if (!admin) {
+      return apiResponse.badRequest(res, messages.ADMIN_NOT_FOUND);
+    }
+
+    // 3️⃣ Check if link already used
+    if (admin.reset_token_used) {
+      return apiResponse.badRequest(
+        res,
+        "This reset link has already been used."
+      );
+    }
+
+    // 4️⃣ Prevent same password
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      admin.password
+    );
+
+    if (isSamePassword) {
+      return apiResponse.badRequest(
+        res,
+        "New password cannot be same as old password"
+      );
+    }
+
+    // 5️⃣ Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    admin.password = hashedPassword;
+
+    // 🔥 Mark link as used (ONE TIME ONLY)
+    admin.reset_token_used = true;
+
+    await admin.save();
+
+    return apiResponse.ok(res, null, messages.PASSWORD_CHANGED);
+
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
 };
 
 
-// ---------- SOCIAL LOGIN
-const socialLogin = async (req, res) => {
-    try {
-        const {
-            socialType,        // google | apple
-            social_id,
-            email,
-            first_name,
-            last_name,
-            device_type,
-            player_id
-        } = req.body;
+// Dashboard Counts
+const dashboardCounts = async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-        /* ---------- VALIDATION ---------- */
-        if (!socialType || !social_id) {
-            return apiResponse.badRequest(res, messages.MSG_EMPTY_PARAM);
-        }
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-        const normalizedType = socialType.toLowerCase();
+    const [
+      totalServices,
+      totalUser,
+      totalDeleteUser,
+      totalFaq,
+      totalBooking,
+      totalHelpSupport,
+      todayBooking,
+      totalVendor,
+      totalWithdraw,
+      totalBroadcast,
+      allBookingsForEarning,
+      todayBookingsForEarning
+    ] = await Promise.all([
+      Service.countDocuments({ is_active: true }),
 
-        // ❌ facebook not supported in schema
-        if (!["google", "apple"].includes(normalizedType)) {
-            return apiResponse.badRequest(res, messages.INVALID_SOCIAL_TYPE);
-        }
+      User.countDocuments({
+        is_deleted: false,
+        is_profile_completed: true,
+        is_verified: true,
+      }),
 
-        /* ---------- BUILD SOCIAL QUERY ---------- */
-        const socialQuery =
-            normalizedType === "google"
-                ? { socialkey_google: social_id }
-                : { socialkey_apple: social_id };
+      User.countDocuments({
+        is_deleted: true,
+        is_profile_completed: true,
+        is_verified: true,
+      }),
 
-        /* ---------- FIND USER ---------- */
-        let user = await User.findOne({
-            ...socialQuery,
-            is_deleted: false
-        });
+      Faq.countDocuments({ is_active: true }),
 
-        /* ================= LOGIN CASE ================= */
-        if (user) {
-            console.log('=--------------', user)
-            /* ===== ADD THIS BLOCK (ANOTHER EMAIL OTP CHECK) ===== */
-            if (user.another_email && !user.is_another_email_verify) {
+      Booking.countDocuments({
+        payment_status: "success",
+        is_deleted: false
+      }),
 
-                const emailOtp = '1234'
+      Contact.countDocuments({}),
 
-                const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+      Booking.countDocuments({
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        payment_status: "success",
+        is_deleted: false
+      }),
 
-                user.email_otp = {
-                    code: emailOtp,
-                    expires_at: otpExpiry
-                };
+      Vendor.countDocuments({ is_deleted: false }),
 
-                await user.save();
+      withdraw.countDocuments({}),
 
-                /* ================= SEND EMAIL ================= */
+      Booking.countDocuments({}), // broadcast proxy
 
-                const postData = {
-                    app_name: process.env.APP_NAME || "YourApp",
-                    app_logo: process.env.APP_LOGO || "https://yourdomain.com/logo.png",
-                    name: user.full_name || user.name || "User",
-                    otp: emailOtp
-                };
+      // ✅ ALL bookings for total earning
+      Booking.find({
+        payment_status: "success",
+        booking_status: { $in: ["confirmed", "completed"] },
+        is_deleted: false
+      }).select("admin_earning"),
 
-                const subject = `${postData.app_name} - Email Verification OTP`;
+      // ✅ TODAY bookings for today's earning
+      Booking.find({
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+        payment_status: "success",
+        booking_status: { $in: ["confirmed", "completed"] },
+        is_deleted: false
+      }).select("admin_earning"),
+    ]);
 
-                const mailBody = mailer.mailBodyEmailOtp(postData);
+    // ✅ Calculate Total Admin Earning
+    const totalAdminEarning = allBookingsForEarning.reduce(
+      (sum, item) => sum + (item.admin_earning || 0),
+      0
+    );
 
-                await mailer.sendMail(user.another_email, subject, mailBody);
+    // ✅ Calculate Today Admin Earning
+    const todayAdminEarning = todayBookingsForEarning.reduce(
+      (sum, item) => sum + (item.admin_earning || 0),
+      0
+    );
 
-                return apiResponse.ok(
-                    res,
-                    { email: user.another_email },
-                    messages.MSG_OTP_SENT
-                );
-            }
-            /* ===== END OF ADDED BLOCK ===== */
+    const data = {
+      services: { total: totalServices },
 
+      customers: {
+        active: totalUser,
+        deleted: totalDeleteUser,
+      },
 
-            // ===== YOUR EXISTING CODE (UNCHANGED) =====
-            user.device_type = device_type || user.device_type;
-            user.player_id = player_id || user.player_id;
-            await user.save();
+      faqs: { total: totalFaq },
 
-            const token = generateToken.generateToken(user._id);
-            const userData = await helper.getUserData(user._id);
+      bookings: {
+        total: totalBooking,
+        today: todayBooking,
+      },
 
-            userData.token = token;
-            userData.is_new_user = !user.is_profile_completed;
+      helpSupport: { total: totalHelpSupport },
 
-            return apiResponse.ok(
-                res,
-                userData,
-                messages.LOGIN_SUCCESSFUL
-            );
-        }
+      vendors: { total: totalVendor },
 
-        /* ---------- EMAIL CONFLICT CHECK ---------- */
-        if (email) {
-            const emailExists = await User.findOne({
-                email: email.toLowerCase().trim(),
-                is_deleted: false
-            });
+      earnings: {
+        totalAdminEarning: totalAdminEarning,
+        todayAdminEarning: todayAdminEarning, // ✅ NEW KEY
+      },
 
-            if (emailExists) {
-                return apiResponse.badRequest(
-                    res,
-                    messages.MSG_EMAIL_EXISTS
-                );
-            }
-        }
+      withdrawals: { total: totalWithdraw },
 
-        /* ================= SIGNUP CASE ================= */
-        const cleanEmail = email
-            ? email.toLowerCase().trim()
-            : `${social_id}@${normalizedType}.social`;
+      broadcasts: { total: totalBroadcast },
+    };
 
-        const userDataToCreate = {
-            email: cleanEmail,
-            first_name: first_name || "",
-            last_name: last_name || "",
-            name: `${first_name} ${last_name}`,
-            login_type: normalizedType,
-            is_verified: true,
-            signup_step: 1,
-            is_profile_completed: false,
+    return apiResponse.ok(res, data, messages.SUCCESS[0]);
 
-            device_type: device_type || null,
-            player_id: player_id || null
-        };
-
-        if (normalizedType === "google") {
-            userDataToCreate.socialkey_google = social_id;
-        } else {
-            userDataToCreate.socialkey_apple = social_id;
-        }
-
-        user = await User.create(userDataToCreate);
-
-        const token = generateToken.generateToken(user._id);
-        const finalUserData = await helper.getUserData(user._id);
-
-        finalUserData.token = token;
-        finalUserData.is_new_user = true;
-
-        return apiResponse.ok(
-            res,
-            finalUserData,
-            messages.SIGNUP_BASIC_INFO_SAVED
-        );
-
-    } catch (error) {
-        console.error("Social Login Error:", error);
-        return apiResponse.serverError(
-            res,
-            messages.SERVER_ERROR,
-            error.message
-        );
-    }
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
 };
 
-// ------------------- LOGOUT ACCOUNT -------------------
-const logout = async (req, res) => {
-    try {
-        const userId = req.userId;
-        const user = await User.findById(userId)
-        user.player_id = null
-        user.device_type = null
+const dashboardCountsVendor = async (req, res) => {
+  try {
+    const vendorId = req.vendor._id;
 
-        await user.save()
+    // 📅 Today range
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-        return apiResponse.ok(res, {}, messages.LOGOUT_SUCCESS)
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message)
-    }
-}
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-// ------------------- Mobile Check -------------------
-const checkMobileNumber = async (req, res) => {
-    try {
-        const { phone_number } = req.body;
-        if (!phone_number)
-            return apiResponse.badRequest(res, messages.PHONE_NUMBER_REQUIRED)
-        const mobileCheck = await User.findOne({ phone_number, is_verified: true, is_deleted: false })
-        if (!mobileCheck) {
-            return apiResponse.ok(res, {}, "")
-        }
-        return apiResponse.badRequest(res, messages.MOBILE_NUMBER_CHECK)
-    } catch (error) {
-        return apiResponse.serverError(res, messages.SERVER_ERROR, error.message)
-    }
-}
+    const [
+      totalEvents,
+      totalBookings,
+      todayBookings,
+      totalCoupons,
+      allVendorBookings,
+      todayVendorBookings
+    ] = await Promise.all([
+
+      // ✅ Total events
+      Event.countDocuments({
+        vendor_id: vendorId,
+        is_deleted: false,
+        is_active: true
+      }),
+
+      // ✅ Total bookings
+      Booking.countDocuments({
+        vendor_id: vendorId,
+        is_deleted: false
+      }),
+
+      // ✅ Today bookings
+      Booking.countDocuments({
+        vendor_id: vendorId,
+        is_deleted: false,
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      }),
+
+      // ✅ Total coupons
+      Coupon.countDocuments({
+        vendor_id: vendorId,
+        is_deleted: false
+      }),
+
+      // ✅ All successful bookings for earning
+      Booking.find({
+        vendor_id: vendorId,
+        payment_status: "success",
+        booking_status: { $in: ["confirmed", "completed"] },
+        is_deleted: false
+      }).select("sub_total admin_earning"),
+
+      // ✅ Today successful bookings for earning
+      Booking.find({
+        vendor_id: vendorId,
+        payment_status: "success",
+        booking_status: { $in: ["confirmed", "completed"] },
+        is_deleted: false,
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      }).select("sub_total admin_earning")
+    ]);
+
+    /* ================= EARNING CALCULATION ================= */
+
+    const totalVendorEarning = allVendorBookings.reduce((sum, item) => {
+      return sum + ((item.sub_total || 0) - (item.admin_earning || 0));
+    }, 0);
+
+    const todayVendorEarning = todayVendorBookings.reduce((sum, item) => {
+      return sum + ((item.sub_total || 0) - (item.admin_earning || 0));
+    }, 0);
+
+    const data = {
+      events: {
+        total: totalEvents
+      },
+      bookings: {
+        total: totalBookings,
+        today: todayBookings
+      },
+      earnings: {
+        total_vendor_earning: totalVendorEarning,   // ✅ NEW
+        today_vendor_earning: todayVendorEarning    // ✅ NEW
+      },
+      coupons: {
+        total: totalCoupons
+      }
+    };
+
+    return apiResponse.ok(
+      res,
+      data,
+      "Vendor dashboard data fetched successfully"
+    );
+
+  } catch (err) {
+    console.error("Vendor dashboard error:", err);
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
 
 export default {
-    signupStepOne, otpVerify, resendOtp, getTopCities, signupStepTwo, getMusicGenres, getEventPreferences, getVibeCheckQuestions, signupStepThree, login, logout, resendEmailOtp, verifyEmailOtp, forgotPassword, resendForgotOtp, verifyForgotOtp, changePassword, socialLogin, checkMobileNumber
+  loginAdmin,
+  verifyTwoFactorLogin,
+  beginSetupTwoFactor,
+  confirmSetupTwoFactor,
+  disableTwoFactor,
+  updateAdminProfile,
+  getAdminDetails,
+  changePassword,
+  adminForgetNewPassword,
+  adminForgetPassword,
+  dashboardCounts,
+  dashboardCountsVendor
 };

@@ -360,7 +360,7 @@ const createVendor = async (req, res) => {
 const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description, registration_number, tax_id } = req.body;
+    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description, registration_number, tax_id, company_type, website } = req.body;
 
     console.log('🔄 Updating vendor:', id);
     console.log('📥 Request body:', req.body);
@@ -493,6 +493,16 @@ const updateVendor = async (req, res) => {
     if (tax_id !== undefined && tax_id !== vendor.tax_id) {
       updates.tax_id = tax_id;
       changes.push(`Tax ID updated`);
+      hasChanges = true;
+    }
+    if (company_type !== undefined && company_type !== vendor.company_type) {
+      updates.company_type = company_type;
+      changes.push(`Company type updated`);
+      hasChanges = true;
+    }
+    if (website !== undefined && website !== vendor.website) {
+      updates.website = website;
+      changes.push(`Website updated`);
       hasChanges = true;
     }
 
