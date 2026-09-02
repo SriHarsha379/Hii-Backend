@@ -27,7 +27,21 @@ const filterEventsVenues = async (req, res) => {
 
     const user = await User.findById(req.userId)
       .select("latitude longitude radius preferred_cities city_id")
+      .populate("city_id", "city_name")
+      .populate("preferred_cities.city_id", "city_name")
       .lean();
+
+    // Featured Clubs/Events — admin scopes a feature to a single city
+    // (stored as a plain city_name string, e.g. "Mumbai") or leaves it
+    // null for "all cities". Build the set of city names relevant to this
+    // user (their active city + any preferred cities) so featured_city
+    // scoping can be checked below.
+    const userCityNames = new Set(
+      [
+        user?.city_id?.city_name,
+        ...(user?.preferred_cities || []).map(c => c.city_id?.city_name)
+      ].filter(Boolean)
+    );
 
     const userBookings = await Booking.find({
       user_id: req.userId,
@@ -117,9 +131,28 @@ const filterEventsVenues = async (req, res) => {
 
       const FEATURED_LIMIT = 2;
 
-      let featuredRaw = validVenues
-        .filter(v => topVenueIds.includes(v._id.toString()))
-        .slice(0, FEATURED_LIMIT);
+      // Admin-curated features (see venueController.featureVenue) take
+      // priority over organic like-count popularity — this was previously
+      // ignored entirely, so featuring a club from admin never actually
+      // changed what the app showed here. A feature is "live" if it hasn't
+      // expired and (when city-scoped) matches this user's city.
+      const now = new Date();
+      const isVenueFeaturedNow = v =>
+        v.is_featured &&
+        (!v.featured_until || new Date(v.featured_until) >= now) &&
+        (!v.featured_city || userCityNames.has(v.featured_city));
+
+      const manuallyFeaturedVenues = validVenues.filter(isVenueFeaturedNow);
+      const manuallyFeaturedVenueIds = new Set(manuallyFeaturedVenues.map(v => v._id.toString()));
+
+      const popularFeaturedVenues = validVenues
+        .filter(v => topVenueIds.includes(v._id.toString()) && !manuallyFeaturedVenueIds.has(v._id.toString()))
+        .slice(0, Math.max(0, FEATURED_LIMIT - manuallyFeaturedVenues.length));
+
+      // All manually-featured venues are shown regardless of count — admin
+      // explicitly chose them. Popularity only fills remaining carousel
+      // slots when there's room left under FEATURED_LIMIT.
+      let featuredRaw = [...manuallyFeaturedVenues, ...popularFeaturedVenues];
 
       const featuredIds = new Set(
         featuredRaw.map(v => v._id.toString())
@@ -271,9 +304,23 @@ const filterEventsVenues = async (req, res) => {
 
       const FEATURED_LIMIT = 2;
 
-      let featuredRaw = validEvents
-        .filter(e => topEventIds.includes(e._id.toString()))
-        .slice(0, FEATURED_LIMIT);
+      // Same fix as the venue branch above — admin's "Feature Event"
+      // (eventController.featureEvent) previously had no effect here at
+      // all; this was purely popularity-driven.
+      const now = new Date();
+      const isEventFeaturedNow = e =>
+        e.is_featured &&
+        (!e.featured_until || new Date(e.featured_until) >= now) &&
+        (!e.featured_city || userCityNames.has(e.featured_city));
+
+      const manuallyFeaturedEvents = validEvents.filter(isEventFeaturedNow);
+      const manuallyFeaturedEventIds = new Set(manuallyFeaturedEvents.map(e => e._id.toString()));
+
+      const popularFeaturedEvents = validEvents
+        .filter(e => topEventIds.includes(e._id.toString()) && !manuallyFeaturedEventIds.has(e._id.toString()))
+        .slice(0, Math.max(0, FEATURED_LIMIT - manuallyFeaturedEvents.length));
+
+      let featuredRaw = [...manuallyFeaturedEvents, ...popularFeaturedEvents];
 
       const featuredIds = new Set(
         featuredRaw.map(e => e._id.toString())
