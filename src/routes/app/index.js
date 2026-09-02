@@ -11,6 +11,8 @@ import vendorAuthRoutes from './vendorAuthRoute.js'
 import ratingRoutes from './ratingRoute.js'
 import chatRoutes from './chatRoutes.js'
 import adsRoutes from './adsRoutes.js'
+import pollRoutes from './pollRoutes.js'
+import contestRoutes from './contestRoutes.js'
 
 const router = express.Router();
 const routeArray = [
@@ -26,7 +28,12 @@ const routeArray = [
   { path: "/vendor/auth", route: vendorAuthRoutes },
   { path: "/rating", route: ratingRoutes },
   { path: "/chat", route: chatRoutes },
-  { path: "/ads", route: adsRoutes }
+  { path: "/ads", route: adsRoutes },
+  // Poll/Contest route files existed with working controllers behind
+  // them, but were never actually mounted here — GET /poll/active and
+  // GET /contest/active both 404'd regardless of what admin created.
+  { path: "/poll", route: pollRoutes },
+  { path: "/contest", route: contestRoutes }
 ];
 
 routeArray?.forEach((routeItem) => {
