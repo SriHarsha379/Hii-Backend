@@ -151,9 +151,42 @@ const deleteAd = async (req, res) => {
 };
 
 
+/* ================= AD ANALYTICS =================
+   Was entirely missing — the app injects ads into feeds but nothing
+   tracked impressions/clicks, and there was no admin view for it.
+   Returns per-ad counts (each ad already carries its own counters)
+   plus totals across all non-deleted ads, for the AdsBroadcast
+   analytics view. */
+const getAdStats = async (req, res) => {
+    try {
+        const ads = await Ads.find({ is_deleted: false })
+            .select("ad_image link_url expiry_date impressions_count clicks_count last_impression_at last_click_at createdAt")
+            .sort({ impressions_count: -1 });
+
+        const totals = ads.reduce(
+            (acc, ad) => {
+                acc.total_impressions += ad.impressions_count || 0;
+                acc.total_clicks += ad.clicks_count || 0;
+                return acc;
+            },
+            { total_impressions: 0, total_clicks: 0 }
+        );
+
+        const ctr = totals.total_impressions > 0
+            ? Number(((totals.total_clicks / totals.total_impressions) * 100).toFixed(2))
+            : 0;
+
+        return apiResponse.ok(res, { ads, totals: { ...totals, ctr } }, "Ad stats fetched successfully");
+    } catch (err) {
+        return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+    }
+};
+
+
 export default {
     createAd,
     getAds,
     updateAd,
-    deleteAd
+    deleteAd,
+    getAdStats
 };

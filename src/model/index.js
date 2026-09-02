@@ -46,6 +46,7 @@ import UserReport from "./userReportModel.js";
 import Ads from "./adsModel.js"
 import ActivityLog from "./activityLogModel.js"
 import Poll from "./pollModel.js"
+import PollVote from "./pollVoteModel.js"
 import Contest from "./contestModel.js"
 import ContestParticipant from "./contestParticipantModel.js"
 export {
@@ -69,6 +70,7 @@ export {
   Vendor,
   PendingVendorOtp,
   Poll,
+  PollVote,
   Contest,
   ContestParticipant,
   Service,

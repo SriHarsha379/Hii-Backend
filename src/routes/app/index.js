@@ -10,6 +10,7 @@ import notification from './notificationRoute.js'
 import vendorAuthRoutes from './vendorAuthRoute.js'
 import ratingRoutes from './ratingRoute.js'
 import chatRoutes from './chatRoutes.js'
+import adsRoutes from './adsRoutes.js'
 
 const router = express.Router();
 const routeArray = [
@@ -24,7 +25,8 @@ const routeArray = [
   { path: "/notification", route: notification },
   { path: "/vendor/auth", route: vendorAuthRoutes },
   { path: "/rating", route: ratingRoutes },
-  { path: "/chat", route: chatRoutes }
+  { path: "/chat", route: chatRoutes },
+  { path: "/ads", route: adsRoutes }
 ];
 
 routeArray?.forEach((routeItem) => {

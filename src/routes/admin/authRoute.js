@@ -1,13 +1,17 @@
 import express from 'express';
 import authController from '../../controller/admin/authController.js';
 import { validate } from '../../middleware/validate.js';
-import { adminLoginSchema, changePasswordSchema, forgetPasswordSchema, forgetNewPasswordSchema } from '../../validation/admin/authValidation.js';
+import { adminLoginSchema, changePasswordSchema, forgetPasswordSchema, forgetNewPasswordSchema, registerOrganiserSchema } from '../../validation/admin/authValidation.js';
 import { adminauth,allowAdminOrVendor, vendorauth } from '../../middleware/authMiddleware.js';
 import upload from '../../middleware/upload.js';
 const route = express.Router();
 route
     // Admin login
     .post('/login', validate(adminLoginSchema), authController.loginAdmin)
+    // NEW: public self-serve sign-up for Club/Event organisers — no
+    // adminauth, this is the entry point for someone with no account
+    // yet. Restricted to CLUB_ADMIN/EVENT_ADMIN inside the controller.
+    .post('/register-organiser', validate(registerOrganiserSchema), authController.registerOrganiser)
     // NEW: second step of login when 2FA is enabled on the account
     .post('/verify-2fa', authController.verifyTwoFactorLogin)
     // NEW: 2FA setup/management for the logged-in admin

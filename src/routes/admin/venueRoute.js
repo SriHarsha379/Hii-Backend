@@ -37,4 +37,11 @@ route.put(
 
 route.delete("/delete_venue/:id", allowAdminOrVendor, venueController.deleteVenue);
 
+// Featured Clubs/Venues — mirrors the Featured Events pattern (was entirely
+// missing: the app already renders a "Featured" section on Venues, but
+// admin had no way to mark a club as featured).
+route.get("/featured", allowAdminOrVendor, venueController.getFeaturedVenues);
+route.post("/feature/:id", allowAdminOrVendor, venueController.featureVenue);
+route.post("/unfeature/:id", allowAdminOrVendor, venueController.unfeatureVenue);
+
 export default route;

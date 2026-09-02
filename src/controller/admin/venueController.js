@@ -417,6 +417,68 @@ const deleteVenue = async (req, res) => {
   }
 };
 
+/* ================= FEATURE VENUE =================
+   Mirrors the Event controller's featured pattern: the app already shows
+   a "Featured" section on the Venues tab, but admin previously had no
+   way to mark a club as featured. Sets is_featured + an expiry
+   (featured_until) based on the requested duration, and an optional
+   city scope. */
+const featureVenue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { duration, city } = req.body;
+
+    const days = Math.max(1, Math.min(30, Number(duration) || 7)); // same 1–30 day cap as events
+    const featured_until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    const venue = await Venue.findOneAndUpdate(
+      { _id: id, is_deleted: false },
+      { is_featured: true, featured_until, featured_city: city && city !== 'all' ? city : null },
+      { new: true }
+    );
+
+    if (!venue) return apiResponse.notFoundResponse(res, "Venue not found");
+    return apiResponse.ok(res, venue, "Venue featured successfully");
+  } catch (error) {
+    return apiResponse.serverError(res, "Server error", error.message);
+  }
+};
+
+const unfeatureVenue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const venue = await Venue.findOneAndUpdate(
+      { _id: id, is_deleted: false },
+      { is_featured: false, featured_until: null, featured_city: null },
+      { new: true }
+    );
+    if (!venue) return apiResponse.notFoundResponse(res, "Venue not found");
+    return apiResponse.ok(res, venue, "Venue unfeatured successfully");
+  } catch (error) {
+    return apiResponse.serverError(res, "Server error", error.message);
+  }
+};
+
+// GET /venues/featured — real list of currently-featured venues (only
+// those whose featured_until hasn't already passed), so the admin
+// "Featured" tab can show a list instead of only offering a way to
+// feature a new one.
+const getFeaturedVenues = async (req, res) => {
+  try {
+    const venues = await Venue.find({
+      is_deleted: false,
+      is_featured: true,
+      $or: [{ featured_until: null }, { featured_until: { $gte: new Date() } }],
+    })
+      .populate("category_ids", "category_name")
+      .sort({ featured_until: 1 });
+
+    return apiResponse.ok(res, venues, "Featured venues fetched successfully");
+  } catch (error) {
+    return apiResponse.serverError(res, "Server error", error.message);
+  }
+};
+
 export default {
   createVenue,
   getAllVenues,
@@ -424,4 +486,7 @@ export default {
   getVenueById,
   updateVenue,
   deleteVenue,
+  featureVenue,
+  unfeatureVenue,
+  getFeaturedVenues,
 };

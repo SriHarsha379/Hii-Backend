@@ -76,6 +76,70 @@ return apiResponse.ok(
   }
 };
 
+// NEW: public self-serve registration for prospective Club/Event
+// organisers. Unlike createAdmin (Super Admin only, in
+// adminManagementController.js), this has no adminauth requirement —
+// it's the entry point for someone who doesn't have an account yet at
+// all. Deliberately restricted to CLUB_ADMIN/EVENT_ADMIN only: this
+// must never be usable to mint a SUPER_ADMIN or NORMAL_ADMIN account.
+// The account this creates has no `organisation` set yet, so after
+// logging in with the token returned here, the existing frontend
+// ProtectedRoute logic already routes them straight into
+// /club-onboarding or /event-onboarding to finish setup — same as the
+// Super-Admin-invited path, just without needing an invite first.
+const registerOrganiser = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password || !role) {
+      return apiResponse.badRequest(res, "Name, email, password, and role are required");
+    }
+
+    const allowedRoles = ["CLUB_ADMIN", "EVENT_ADMIN"];
+    if (!allowedRoles.includes(role)) {
+      return apiResponse.badRequest(res, "Role must be CLUB_ADMIN or EVENT_ADMIN");
+    }
+
+    if (password.length < 6) {
+      return apiResponse.badRequest(res, "Password must be at least 6 characters");
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = await Admin.findOne({ email: cleanEmail, is_deleted: { $ne: true } });
+    if (existing) {
+      return apiResponse.badRequest(res, "An account with this email already exists");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const admin = await Admin.create({
+      name: name.trim(),
+      email: cleanEmail,
+      password: hashedPassword,
+      role,
+    });
+
+    const token = jwtt.generateToken(admin._id, "admin");
+
+    return apiResponse.ok(
+      res,
+      {
+        token,
+        email: admin.email,
+        _id: admin._id,
+        name: admin.name,
+        role: admin.role,
+        organisation: admin.organisation,
+      },
+      "Account created successfully"
+    );
+  } catch (err) {
+    if (err?.code === 11000) {
+      return apiResponse.badRequest(res, "An account with this email already exists");
+    }
+    return apiResponse.serverError(res, "Server error", err.message);
+  }
+};
+
 // NEW: second step of login when 2FA is enabled — takes the pending
 // token from loginAdmin above plus the 6-digit code from the admin's
 // authenticator app, and issues the real session token on success.
@@ -628,6 +692,7 @@ const dashboardCountsVendor = async (req, res) => {
 
 export default {
   loginAdmin,
+  registerOrganiser,
   verifyTwoFactorLogin,
   beginSetupTwoFactor,
   confirmSetupTwoFactor,

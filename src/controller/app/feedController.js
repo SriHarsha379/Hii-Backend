@@ -32,7 +32,14 @@ const getHomeData = async (req, res) => {
         counter++;
 
         if (counter === nextInsertAfter && ads[adIndex]) {
-          let adObj = { type: "ad" };
+          // ad_id/link_url were previously missing here, which meant the
+          // app had no way to report back which ad was shown/tapped, or
+          // to open the ad's link at all.
+          let adObj = {
+            type: "ad",
+            ad_id: ads[adIndex]._id,
+            link_url: ads[adIndex].link_url || null,
+          };
 
           // ✅ SAME KEY AS ORIGINAL RESPONSE
           if (type === "member") {

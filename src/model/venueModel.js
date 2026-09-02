@@ -86,6 +86,13 @@ const VenueSchema = new mongoose.Schema(
 
     is_active: { type: Boolean, default: true },
     is_deleted: { type: Boolean, default: false },
+
+    // Featured Clubs/Venues — mirrors the Event model's featured pattern.
+    // featured_city is optional — null means featured everywhere, a city
+    // name scopes it to just that city's feed.
+    is_featured: { type: Boolean, default: false },
+    featured_until: { type: Date, default: null },
+    featured_city: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -367,4 +367,12 @@ export default {
   REPORT_NOT_FOUND: ["Report not found"],
   REPORT_STATUS_UPDATED: ["Report status updated successfully"],
   ACTIVITY_LOGS_FETCHED: ["Activity logs fetched successfully"],
+
+  // App-side polls
+  POLLS_FETCHED: ["Polls fetched successfully"],
+  VOTE_RECORDED: ["Vote recorded successfully"],
+
+  // App-side contests
+  CONTESTS_FETCHED: ["Contests fetched successfully"],
+  CONTEST_ENTERED: ["Contest entry recorded successfully"],
 };

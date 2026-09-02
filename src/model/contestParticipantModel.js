@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
 
-// NEW: backs GET /contests/:id/participants. There's no app-side contest
-// entry flow built yet, so this collection will genuinely be empty for
-// now — that's an honest reflection of reality, not a bug. Exists so
-// that endpoint returns a real (if currently empty) query result rather
-// than a hardcoded fake response.
+// Backs GET /contests/:id/participants (admin) and the real app-side
+// entry flow at POST /contest/:id/enter (contestController.js in
+// controller/app/). This used to be a genuinely empty collection since
+// nothing wrote to it — that's no longer the case now that users can
+// actually enter contests from the app.
 
 const ContestParticipantSchema = new mongoose.Schema(
   {
@@ -27,6 +27,11 @@ const ContestParticipantSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// NEW: was no constraint at all preventing the same user from entering
+// the same contest multiple times. One entry per user per contest, same
+// pattern as PollVote's poll_id+user_id index.
+ContestParticipantSchema.index({ contest_id: 1, user_id: 1 }, { unique: true });
 
 const ContestParticipant = mongoose.model("ContestParticipant", ContestParticipantSchema);
 

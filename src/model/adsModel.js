@@ -34,6 +34,25 @@ const AdSchema = new mongoose.Schema(
             type: Boolean,
             default: false
         },
+
+        // Ad analytics — was completely untracked: ads were injected into
+        // feeds but nothing recorded how often they were shown or tapped.
+        impressions_count: {
+            type: Number,
+            default: 0,
+        },
+        clicks_count: {
+            type: Number,
+            default: 0,
+        },
+        last_impression_at: {
+            type: Date,
+            default: null,
+        },
+        last_click_at: {
+            type: Date,
+            default: null,
+        },
     },
     {
         timestamps: true
