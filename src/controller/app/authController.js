@@ -387,6 +387,17 @@ const signupStepTwo = async (req, res) => {
 
         const {
             preferred_cities,
+            // These were validated by signupStepTwoSchema but never actually
+            // read here — meaning user.latitude/longitude/radius (the fields
+            // manageController's distance filtering actually uses, as
+            // opposed to preferred_cities which only feeds the "switch
+            // city" UI list) were never set at signup, for ANY new user.
+            // A fresh account fell back to a bare 50km default with no
+            // real center point until they separately used the location
+            // filter after onboarding.
+            latitude,
+            longitude,
+            radius,
             bio,
             instagram_account,
             spotify_account,
@@ -408,6 +419,13 @@ const signupStepTwo = async (req, res) => {
         if (preferred_cities !== undefined) {
             user.preferred_cities = preferred_cities;
         }
+
+        // Real feed-filtering location — "All Cities" is represented by the
+        // app sending a large radius here rather than a special flag, so no
+        // schema change was needed on this side either.
+        if (latitude !== undefined) user.latitude = latitude;
+        if (longitude !== undefined) user.longitude = longitude;
+        if (radius !== undefined) user.radius = radius;
 
 
         // optional fields
