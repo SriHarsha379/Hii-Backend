@@ -42,6 +42,18 @@ const appAuth = async (req, res, next) => {
       req.user_type
       if (!user) return apiResponse.notFoundResponse(res, messages.NOT_FOUND);
       if (!user.is_active) return apiResponse.accountDeactiveResponse(res, messages.ACCOUNT_DEACTIVATE_BY_ADMIN);
+
+      // Activity tracking for the inactive-member reminder cron — was
+      // completely untracked before. Throttled to once per 15 minutes per
+      // user rather than every single request, since a normal session
+      // makes many API calls in a few minutes and this field only needs
+      // day-level granularity for its actual purpose. Fire-and-forget so
+      // it never adds latency to the real request.
+      const ACTIVITY_THROTTLE_MS = 15 * 60 * 1000;
+      if (!user.last_active_at || Date.now() - new Date(user.last_active_at).getTime() > ACTIVITY_THROTTLE_MS) {
+        User.updateOne({ _id: user._id }, { $set: { last_active_at: new Date() } }).catch(() => {});
+      }
+
       next();
     } catch (err) {
       return apiResponse.unauthorized(res, messages.TOKEN_INVALID);

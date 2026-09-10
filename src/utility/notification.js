@@ -106,6 +106,12 @@ const sendNotification = async (type, playerId, extraData = {}, badge = 0) => {
       icon = '✨';
       break;
 
+    case 'inactivity_reminder':
+      title = 'We miss you 👋';
+      message = "It's been a while — new members, events, and venues are waiting for you.";
+      icon = '👋';
+      break;
+
     default:
       message = '🔔 You have a new notification!';
   }

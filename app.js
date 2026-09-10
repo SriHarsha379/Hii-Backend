@@ -10,6 +10,8 @@ import "./src/config/db_config.js";
 import configureSocket from "./src/config/socket_config.js";
 import adminRoute from "./src/routes/admin/index.js";
 import appRoute from "./src/routes/app/index.js";
+import { startProfileCompletionReminderJob } from "./src/cron/profileCompletionReminderJob.js";
+import { startInactiveMemberReminderJob } from "./src/cron/inactiveMemberReminderJob.js";
 
 dotenv.config();
 
@@ -75,10 +77,22 @@ const io = new Server(server, {
 // socket logic
 configureSocket(io);
 
-// ✅ Server Start 
+// ✅ Server Start
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`✅ Server is running on port ${PORT}`);
   console.log(`✅ Socket.IO server is running on ws://localhost:${PORT}/app/server/socket.io`);
+
+  // Proactive profile-completion reminder — reaches users even if they
+  // never open the app again, unlike the two existing reminder paths
+  // (edit-triggered push, and the Flutter local notification on
+  // open/resume). See src/cron/profileCompletionReminderJob.js.
+  startProfileCompletionReminderJob();
+  console.log(`✅ Profile completion reminder cron scheduled (daily, 18:00 server time)`);
+
+  // Client's ask: "app notifications when a member is not active on the
+  // app." See src/cron/inactiveMemberReminderJob.js.
+  startInactiveMemberReminderJob();
+  console.log(`✅ Inactive member reminder cron scheduled (daily, 19:00 server time)`);
 });

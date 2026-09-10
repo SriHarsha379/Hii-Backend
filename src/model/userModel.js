@@ -32,6 +32,20 @@ const UserSchema = new mongoose.Schema(
 
     profile_image: { type: String, default: "" },
 
+    /* ================= ACTIVITY ================= */
+
+    // Updated (throttled, see appAuth middleware) on real authenticated
+    // app requests — the actual signal for "is this member active on the
+    // app", which nothing on this schema tracked at all before. Backs
+    // the inactive-member reminder cron (src/cron/inactiveMemberReminderJob.js).
+    last_active_at: { type: Date, default: Date.now },
+
+    // Cooldown tracking for the inactivity nudge itself, same pattern as
+    // last_profile_reminder_sent_at below — separate from last_active_at
+    // so re-engaging with the app resets activity without needing to
+    // also touch this field.
+    last_inactivity_nudge_sent_at: { type: Date, default: null },
+
     /* ================= VERIFICATION ================= */
 
     is_verified: { type: Boolean, default: false },
@@ -41,6 +55,14 @@ const UserSchema = new mongoose.Schema(
     // Used to avoid re-notifying the user on every small edit when the
     // percentage hasn't actually improved since the last notification.
     last_notified_profile_completion: { type: Number, default: null },
+
+    // Separate from the field above — that one tracks percentage (for the
+    // edit-triggered nudge in helper.checkAndNotifyProfileCompletion).
+    // This tracks *when* the scheduled cron reminder (profileCompletionReminderJob)
+    // last fired for this user, so someone who never opens the app at all
+    // still gets nudged periodically, not just people who trigger an edit
+    // or bring the app to the foreground.
+    last_profile_reminder_sent_at: { type: Date, default: null },
 
     otp: {
       code: { type: String },

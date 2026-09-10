@@ -380,8 +380,11 @@ const adminForgetPassword = async (req, res) => {
     });
 
     // 3. Reset link
-    // const resetLink = `https://hii.life/app/admin/reset-password/${token}`;
-    const resetLink = `http://localhost:3000/app/admin/reset-password/${token}`;
+    // BUG FIX: this was hardcoded to localhost:3000, so every "forgot
+    // password" email sent from production pointed admins at their own
+    // machine instead of https://hii.life. Matches the working pattern
+    // already used for vendor password resets (vendorAuthController.js).
+    const resetLink = `${process.env.ADMIN_DASHBOARD_URL || "https://hii.life"}/app/admin/reset-password/${token}`;
 
     // 4. Prepare email body
     const mailBody = sendmail.mailBodyForgetPassword({

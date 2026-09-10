@@ -52,7 +52,13 @@ const getHomeData = async (req, res) => {
 
           result.push(adObj);
 
-          adIndex++;
+          // FIXED: was `adIndex++` with no wraparound — patternIndex right
+          // below correctly wraps (`% pattern.length`), but this one
+          // didn't, so once adIndex reached ads.length, ads[adIndex]
+          // became undefined and every remaining ad slot for the rest of
+          // this page silently got nothing. Client's exact ask: ads
+          // should repeat once there are no new ones left, not run out.
+          adIndex = (adIndex + 1) % ads.length;
           patternIndex = (patternIndex + 1) % pattern.length;
           nextInsertAfter = pattern[patternIndex];
           counter = 0;
@@ -423,6 +429,12 @@ const getHomeData = async (req, res) => {
 
           timing: helper.formatVenueTime(v.start_time, v.end_time),
           address: v.address,
+
+          // Was computed into distance_km below but never actually sent
+          // in the response itself — the map view needs real coordinates
+          // to plot a pin, not just a precomputed distance number.
+          latitude: v.latitude,
+          longitude: v.longitude,
 
           distance_km: helper.getDistanceInKm(
             currentUserLocation.latitude,
