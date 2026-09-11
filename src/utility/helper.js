@@ -86,7 +86,9 @@ async function getUserData(userId) {
       .populate("preferred_cities.city_id")
       .populate("music_genre")
       .populate("event_preferences")
-      .populate("vibes")
+      // Note: no .populate("vibes") here - the curated Vibe ref field was
+      // removed from the User schema (see userModel.js), replaced by
+      // free-text custom_vibes, which needs no populating.
       .populate({
         path: "vibe_checks.question_id",
         model: "VibeCheckQuestion",
