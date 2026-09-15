@@ -15,7 +15,6 @@ route
     .post("/signup_step_two", appAuth, validate(signupStepTwoSchema), authController.signupStepTwo)
     .get("/music-genres", appAuth, authController.getMusicGenres)
     .get("/event-preferences", appAuth, authController.getEventPreferences)
-    .get("/vibes", appAuth, authController.getVibes)
     .get("/get_vibe_checks", appAuth, authController.getVibeCheckQuestions)
     .post("/signup_step_three", appAuth, upload.fields([
         { name: "images", maxCount: 9 },

@@ -20,7 +20,7 @@ import Venue from './venueModel.js'
 import VenueLike from './venueLikeModel.js'
 import Ticket from './ticketModel.js'
 import Genre from './genreModel.js'
-import Vendor from './vendorModel.js'
+import Vendor from './VendorModel.js'
 import PendingVendorOtp from './pendingVendorOtpModel.js'
 import Service from './serviceModel.js'
 import withdraw from "./withdrawModel.js";
