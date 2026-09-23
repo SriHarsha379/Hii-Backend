@@ -89,6 +89,14 @@ const BookingSchema = new mongoose.Schema(
       default: 1
     },
 
+    // Friends invited to join this reservation, from the booking user's
+    // accepted connections. Not the same as number_of_guests (a plain
+    // headcount) — these are specific, notifiable app members.
+    invited_friend_ids: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: []
+    },
+
     is_cover: {
       type: Boolean,
       default: false
@@ -217,4 +225,4 @@ BookingSchema.post("findOne", function (doc) {
 });
 
 const Booking = mongoose.model("Booking", BookingSchema);
-export default Booking; 
+export default Booking;

@@ -835,6 +835,66 @@ const updateUserHobbies = async (req, res) => {
   }
 };
 
+// ---------- UPDATE VIBE CHECK ANSWERS (post-signup)
+// Lets a member answer Vibe Check questions after onboarding — e.g. from
+// the "Answer Vibe Check Questions" profile-completion prompt/reminder,
+// for anyone who skipped it during signup. Mirrors updateUserHobbies:
+// same shape signupStepThree already saves (question_id + answer pairs),
+// capped at 3 like editProfile's own vibe_checks handling.
+const updateUserVibeChecks = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { vibe_checks } = req.body;
+
+    if (vibe_checks === undefined) {
+      return apiResponse.badRequest(res, messages.MSG_EMPTY_PARAM);
+    }
+
+    const toArray = (v) => (Array.isArray(v) ? v : [v]);
+
+    const cleanedVibeChecks = toArray(vibe_checks)
+      .filter(vc => vc && vc.question_id && String(vc.answer || '').trim() !== '')
+      .map(vc => ({
+        question_id: vc.question_id,
+        answer: String(vc.answer).trim()
+      }))
+      .slice(0, 3);
+
+    if (cleanedVibeChecks.length === 0) {
+      return apiResponse.badRequest(res, messages.MSG_EMPTY_PARAM);
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId, is_deleted: false },
+      { $set: { vibe_checks: cleanedVibeChecks } },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return apiResponse.badRequest(res, messages.USER_NOT_FOUND);
+    }
+
+    helper.checkAndNotifyProfileCompletion(userId).catch(() => {});
+
+    const token = generateToken.generateToken(userId);
+    const userData = await helper.getUserData(userId);
+    userData.token = token;
+
+    return apiResponse.ok(
+      res,
+      userData,
+      messages.DATA_UPDATED
+    );
+
+  } catch (error) {
+    return apiResponse.serverError(
+      res,
+      messages.SERVER_ERROR,
+      error.message
+    );
+  }
+};
+
 // ---------- GET RECENT LIKED EVENTS / VENUES
 const getRecentLikedItems = async (req, res) => {
   try {
@@ -1218,7 +1278,7 @@ const updateNotificationSetting = async (req, res) => {
   }
 };
 
-// enable 2-fa 
+// enable 2-fa
 const enableTwoFA = async (req, res) => {
   const user_id = req.userId;
   try {
@@ -1475,6 +1535,6 @@ let checkConverationId = async (req, res) => {
 
 export default {
   admindetails, checkConverationId,
-  editProfile, updateProfileVisibility, getSwipeProfileSettings, updateMyVisibility, updateGalleryItemVisibility, deleteAccount, getFaqForCustomer, reportProblem, getSupportEmail, updateUserInterests, getMyProfile, uploadUserGallery, updateUserHobbies, getRecentLikedItems,
+  editProfile, updateProfileVisibility, getSwipeProfileSettings, updateMyVisibility, updateGalleryItemVisibility, deleteAccount, getFaqForCustomer, reportProblem, getSupportEmail, updateUserInterests, getMyProfile, uploadUserGallery, updateUserHobbies, updateUserVibeChecks, getRecentLikedItems,
   updateSocialAccount, addUserVibes, addUserEventPreferences, deleteUserGalleryItem, updateNotificationSetting, userChangePassword, enableTwoFA, getMyVisibility, getNotificationSettings
 };

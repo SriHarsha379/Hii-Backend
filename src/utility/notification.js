@@ -32,9 +32,19 @@ const sendNotification = async (type, playerId, extraData = {}, badge = 0) => {
       break;
 
     case 'venue_booking_confirmed':
-      title = 'Ticket Confirmed 🎟️';
-      message = `Your booking has been confirmed successfully.`;
-      icon = '🎟️';
+      // Venues = reservations, not tickets (events are the ones with
+      // tickets) — this was copy-pasted from event_booking_confirmed.
+      title = 'Reservation Confirmed 🎉';
+      message = `Your table reservation has been confirmed successfully.`;
+      icon = '🎉';
+      break;
+
+    case 'venue_booking_invite':
+      title = 'You\'re invited! 🎉';
+      message = extraData.inviter_name
+        ? `${extraData.inviter_name} invited you to join their reservation${extraData.venue_name ? ` at ${extraData.venue_name}` : ''}.`
+        : `You've been invited to a reservation.`;
+      icon = '🎉';
       break;
 
     case 'event_booking_confirmed':

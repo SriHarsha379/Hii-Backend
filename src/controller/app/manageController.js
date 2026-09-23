@@ -1405,13 +1405,17 @@ const getProfileCompletionStatus = async (req, res) => {
     // (helper.calculateProfileCompletion) so this endpoint and the
     // notification-trigger logic (helper.checkAndNotifyProfileCompletion)
     // can never drift out of sync with each other.
-    const { percentage, messages: messagesList } = helper.calculateProfileCompletion(user);
+    const { percentage, messages: messagesList, fields: fieldsList } = helper.calculateProfileCompletion(user);
 
     return apiResponse.ok(
       res,
       {
         profile_completion_percentage: percentage,
-        messages: messagesList
+        messages: messagesList,
+        // Stable keys parallel to `messages`, in the same priority order —
+        // lets the app deep-link to the exact missing field rather than
+        // just showing text.
+        fields: fieldsList
       },
       messages.DATA_FOUND
     );

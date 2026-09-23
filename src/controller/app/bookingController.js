@@ -1,5 +1,5 @@
 import mongoose from "mongoose"
-import { Ticket, Venue, Event, Coupon, Booking, User, Commission } from "../../model/index.js"
+import { Ticket, Venue, Event, Coupon, Booking, User, Commission, Friendship } from "../../model/index.js"
 import apiResponse from "../../utility/apiResponse.js"
 import messages from "../../utility/messages.js"
 import sendNotification from "../../utility/notification.js";
@@ -65,7 +65,7 @@ const getEventTickets = async (req, res) => {
     return apiResponse.serverError(res, messages.SERVER_ERROR, error.message)
   }
 }
-// Get Coupon Percentage 
+// Get Coupon Percentage
 const getCouponPercentage = async (req, res) => {
   try {
     const { coupon_code, vendor_id, event_id, venue_id } = req.query
@@ -489,7 +489,11 @@ const createVenueBooking = async (req, res) => {
       full_name,
       phone_number,
       country_code,
-      email
+      email,
+
+      // "Reservation with friends" — optional array of user _ids from
+      // the booking user's accepted connections.
+      invited_friend_ids
     } = req.body;
 
     /* ================= VALIDATION ================= */
@@ -594,6 +598,35 @@ const createVenueBooking = async (req, res) => {
     // 3️⃣ Calculate Admin Commission
     const admin_earning = (finalTaxableAmount * commission_percentage) / 100;
 
+    /* ================= VALIDATE INVITED FRIENDS ================= */
+    // Only allow inviting people who are actually accepted connections —
+    // stops someone passing arbitrary user IDs that aren't real friends.
+    let validInvitedFriendIds = [];
+    if (Array.isArray(invited_friend_ids) && invited_friend_ids.length > 0) {
+      const candidateIds = invited_friend_ids
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => id.toString());
+
+      if (candidateIds.length > 0) {
+        const acceptedFriendships = await Friendship.find({
+          status: "accepted",
+          $or: [
+            { user_id_1: userId, user_id_2: { $in: candidateIds } },
+            { user_id_2: userId, user_id_1: { $in: candidateIds } }
+          ]
+        }).select("user_id_1 user_id_2").lean();
+
+        const friendIdSet = new Set();
+        for (const f of acceptedFriendships) {
+          const otherId = f.user_id_1.toString() === userId.toString()
+            ? f.user_id_2.toString()
+            : f.user_id_1.toString();
+          friendIdSet.add(otherId);
+        }
+        validInvitedFriendIds = candidateIds.filter(id => friendIdSet.has(id));
+      }
+    }
+
     /* ================= CREATE BOOKING ================= */
 
     const booking = await Booking.create({
@@ -623,6 +656,7 @@ const createVenueBooking = async (req, res) => {
       slot_time: slotDateTime,
 
       number_of_guests: Number(number_of_guests),
+      invited_friend_ids: validInvitedFriendIds,
       is_cover: is_cover || false,
       special_request: special_request || "",
       city_name: city_name || "",
@@ -633,7 +667,7 @@ const createVenueBooking = async (req, res) => {
     /* ================= SEND BOOKING PUSH ================= */
 
     const user = await User.findById(userId)
-      .select("player_id")
+      .select("player_id name")
       .lean();
 
     if (user?.player_id) {
@@ -649,6 +683,35 @@ const createVenueBooking = async (req, res) => {
           venue_id: venue._id
         },
         0
+      );
+    }
+
+    /* ================= NOTIFY INVITED FRIENDS ================= */
+    if (validInvitedFriendIds.length > 0) {
+      const invitedUsers = await User.find({
+        _id: { $in: validInvitedFriendIds }
+      }).select("player_id").lean();
+
+      await Promise.all(
+        invitedUsers
+          .filter(u => u.player_id)
+          .map(u =>
+            sendNotification(
+              "venue_booking_invite",
+              u.player_id,
+              {
+                type: 'venue_booking_invite',
+                senderId: userId,
+                other_user_id: userId,
+                action: "venue_booking_invite",
+                booking_id: booking._id,
+                venue_id: venue._id,
+                inviter_name: user?.name || "A friend",
+                venue_name: venue?.venue_name || ""
+              },
+              0
+            ).catch(() => {})
+          )
       );
     }
 

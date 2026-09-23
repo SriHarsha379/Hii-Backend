@@ -23,6 +23,7 @@ route
     upload.fields([{ name: "images" }, { name: "videos" }, { name: "thumbnails" }
     ]), userController.uploadUserGallery)
   .post('/update_hobbies', appAuth, userController.updateUserHobbies)
+  .post('/update_vibe_checks', appAuth, userController.updateUserVibeChecks)
   .get("/recently_liked_items", appAuth, userController.getRecentLikedItems)
   .post("/update_social_account", appAuth, userController.updateSocialAccount)
   .post('/add_vibes', appAuth, userController.addUserVibes)
@@ -71,4 +72,3 @@ route.get('/admin_details',appAuth ,userController.admindetails)
 
 route.post('/user_convertion_details',appAuth ,userController.checkConverationId)
 export default route;
-

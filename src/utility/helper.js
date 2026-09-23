@@ -392,12 +392,17 @@ const calculateProfileCompletion = (user) => {
   if (!user?.is_profile_completed) {
     return {
       percentage: 0,
-      messages: ["Complete your basic profile first."]
+      messages: ["Complete your basic profile first."],
+      fields: ["basic_profile"]
     };
   }
 
   let percentage = 75;
   const messagesList = [];
+  // Stable machine-readable key alongside each human message, in the same
+  // order — lets callers (notifications, deep-linking) know exactly which
+  // screen/field to send the member to, without parsing message text.
+  const fieldsList = [];
 
   const galleryCount = user.user_gallery?.length || 0;
   const hasBio = user.bio && user.bio.trim() !== "";
@@ -410,6 +415,7 @@ const calculateProfileCompletion = (user) => {
     percentage += 5;
   } else {
     messagesList.push(`Add ${9 - galleryCount} more Images/Videos`);
+    fieldsList.push("gallery");
   }
 
   /* ================= INSTAGRAM ================= */
@@ -417,6 +423,7 @@ const calculateProfileCompletion = (user) => {
     percentage += 5;
   } else {
     messagesList.push("Connect Instagram");
+    fieldsList.push("instagram");
   }
 
   /* ================= HOBBIES ================= */
@@ -424,6 +431,7 @@ const calculateProfileCompletion = (user) => {
     percentage += 5;
   } else {
     messagesList.push("Add Hobby");
+    fieldsList.push("hobbies");
   }
 
   /* ================= VIBE CHECK ================= */
@@ -431,6 +439,7 @@ const calculateProfileCompletion = (user) => {
     percentage += 5;
   } else {
     messagesList.push("Answer Vibe Check Questions");
+    fieldsList.push("vibe_check");
   }
 
   /* ================= BIO ================= */
@@ -438,9 +447,10 @@ const calculateProfileCompletion = (user) => {
     percentage += 5;
   } else {
     messagesList.push("Complete Bio");
+    fieldsList.push("bio");
   }
 
-  return { percentage, messages: messagesList };
+  return { percentage, messages: messagesList, fields: fieldsList };
 };
 
 /**
@@ -467,7 +477,7 @@ const checkAndNotifyProfileCompletion = async (userId, { silent = false } = {}) 
 
     if (!user) return;
 
-    const { percentage, messages: missing } = calculateProfileCompletion(user);
+    const { percentage, messages: missing, fields: missingFields } = calculateProfileCompletion(user);
     const lastNotified = user.last_notified_profile_completion;
     const hasImproved = lastNotified == null || percentage > lastNotified;
 
@@ -481,7 +491,10 @@ const checkAndNotifyProfileCompletion = async (userId, { silent = false } = {}) 
           action: "profile_completion",
           percentage,
           missing_count: missing.length,
-          next_step: missing[0] || null
+          next_step: missing[0] || null,
+          // Stable key the app uses to deep-link straight to the right
+          // screen/field instead of just opening a generic list.
+          next_step_field: missingFields?.[0] || null
         },
         0
       );

@@ -57,7 +57,7 @@ const runProfileCompletionReminderJob = async () => {
 
   for (const user of candidates) {
     try {
-      const { percentage, messages } = helper.calculateProfileCompletion(user);
+      const { percentage, messages, fields } = helper.calculateProfileCompletion(user);
 
       // Complete profiles have nothing to nudge — still stamp the
       // timestamp so we don't keep re-querying them every run.
@@ -78,6 +78,7 @@ const runProfileCompletionReminderJob = async () => {
           action: "profile_completion",
           percentage,
           next_step: messages[0] || null,
+          next_step_field: fields[0] || null
         },
         0
       );
