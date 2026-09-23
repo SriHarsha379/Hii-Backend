@@ -242,6 +242,8 @@ const filterEventsVenues = async (req, res) => {
           venue_id: v._id,
           venue_name: v.venue_name,
           venue_image: v.venue_image,
+          latitude: v.latitude,
+          longitude: v.longitude,
           location: v.address,
           categories: v.category_ids?.map(c => ({
             _id: c._id,
@@ -252,6 +254,8 @@ const filterEventsVenues = async (req, res) => {
           venue_id: v._id,
           venue_name: v.venue_name,
           venue_image: v.venue_image,
+          latitude: v.latitude,
+          longitude: v.longitude,
           location: v.address,
           distance_km: v.distance_km,
           address: v.address,
@@ -264,6 +268,8 @@ const filterEventsVenues = async (req, res) => {
           venue_id: v._id,
           venue_name: v.venue_name,
           venue_image: v.venue_image,
+          latitude: v.latitude,
+          longitude: v.longitude,
           location: v.address,
           distance_km: v.distance_km,
           address: v.address,
@@ -469,6 +475,17 @@ const filterEventsVenues = async (req, res) => {
         return { ...m, distance_km: minDistance, withinAnyRadius };
       }).filter(m => m.withinAnyRadius);
 
+      // Name search covers every member (not just the few shown by
+      // default, and not only those inside the search radius).
+      const searchRegex = search && search.trim()
+        ? new RegExp(escapeRegex(search.trim()), "i")
+        : null;
+      const searchableMembers = searchRegex
+        ? members
+            .map(m => ({ ...m, distance_km: computeDistanceWithOrigins(m.latitude, m.longitude).minDistance }))
+            .filter(m => searchRegex.test(m.name || "") || searchRegex.test(m.bio || ""))
+        : validMembers;
+
       // Popularity signal = accepted friendships, same "count relations,
       // rank by count" pattern as venue/event likes above.
       const friendships = await Friendship.find({ status: "accepted" })
@@ -489,7 +506,7 @@ const filterEventsVenues = async (req, res) => {
 
       const FEATURED_LIMIT = 2;
 
-      let featuredRaw = validMembers
+      let featuredRaw = searchableMembers
         .filter(m => topMemberIds.includes(m._id.toString()))
         .slice(0, FEATURED_LIMIT);
 
@@ -497,26 +514,26 @@ const filterEventsVenues = async (req, res) => {
         featuredRaw.map(m => m._id.toString())
       );
 
-      let nearbyRaw = validMembers
+      let nearbyRaw = searchableMembers
         .filter(m =>
           m.distance_km != null &&
           !featuredIds.has(m._id.toString())
         )
         .sort((a, b) => a.distance_km - b.distance_km)
-        .slice(0, 3);
+        .slice(0, 10);
 
       const nearbyIds = new Set(
         nearbyRaw.map(m => m._id.toString())
       );
 
-      let recommendedRaw = validMembers.filter(m =>
+      let recommendedRaw = searchableMembers.filter(m =>
         !featuredIds.has(m._id.toString()) &&
         !nearbyIds.has(m._id.toString())
       );
 
       recommendedRaw = recommendedRaw
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 3);
+        .slice(0, 10);
 
       const genresOf = (m) => [
         ...(m.music_genre || []).map(g => g.name).filter(Boolean),

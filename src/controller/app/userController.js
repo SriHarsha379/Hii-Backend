@@ -124,7 +124,7 @@ const editProfile = async (req, res) => {
     if (custom_vibes !== undefined) user.custom_vibes = toArray(custom_vibes);
 
     if (vibe_checks !== undefined)
-      user.vibe_checks = toArray(vibe_checks).slice(0, 3);
+      user.vibe_checks = helper.cleanVibeChecks(toArray(vibe_checks)).slice(0, 3);
 
     /* ================= IDENTITY ================= */
     if (sexuality !== undefined) user.sexuality = sexuality;
@@ -853,7 +853,7 @@ const updateUserVibeChecks = async (req, res) => {
     const toArray = (v) => (Array.isArray(v) ? v : [v]);
 
     const cleanedVibeChecks = toArray(vibe_checks)
-      .filter(vc => vc && vc.question_id && String(vc.answer || '').trim() !== '')
+      .filter(vc => vc && vc.question_id && helper.isMeaningfulAnswer(vc.answer))
       .map(vc => ({
         question_id: vc.question_id,
         answer: String(vc.answer).trim()

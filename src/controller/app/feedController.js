@@ -730,7 +730,7 @@ const getMemberDetail = async (req, res) => {
 
     /* ===== VIBE CHECK Q&A (personality answers) ===== */
     const vibeChecks = (member.vibe_checks || [])
-      .filter((vc) => vc.question_id && vc.answer)
+      .filter((vc) => vc.question_id && helper.isMeaningfulAnswer(vc.answer))
       .map((vc) => ({
         question: vc.question_id.question || "",
         answer: vc.answer

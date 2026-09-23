@@ -32,6 +32,25 @@ function generateRandomEmail() {
   const randomString = Math.random().toString(36).substring(2, 10); // random 8 chars
   return `user_${randomString}@grown.com`;
 }
+
+/* Vibe-check answers like "later", "skip", "na", "-" are people typing
+   anything just to get past signup - treat them as unanswered. */
+const PLACEHOLDER_ANSWERS = new Set([
+  "later", "skip", "skipped", "na", "none", "nil", "null", "nothing", "no",
+  "idk", "dontknow", "notsure", "tbd", "test", "testing", "asdf", "abc",
+  "xyz", "ok", "okay", "hi", "hello"
+]);
+const isMeaningfulAnswer = (answer) => {
+  const norm = String(answer ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (norm.length < 2) return false;
+  if (PLACEHOLDER_ANSWERS.has(norm)) return false;
+  // "will add later", "i'll fill later", "update it later" ...
+  if (/^(iwill|will|ill|to)?(do|add|fill|update|answer|write|tell)?(it|this|them)?later$/.test(norm)) return false;
+  return true;
+};
+const cleanVibeChecks = (list) =>
+  (Array.isArray(list) ? list : []).filter((vc) => vc && isMeaningfulAnswer(vc.answer));
+
 const getPagination = (page, limits) => {
   const limit = limits ? limits : 10;
   let pages = page ? page : 0;
@@ -408,7 +427,7 @@ const calculateProfileCompletion = (user) => {
   const hasBio = user.bio && user.bio.trim() !== "";
   const hasInstagram = user.instagram_account && user.instagram_account.trim() !== "";
   const hasHobbies = user.hobbies && user.hobbies.length > 0;
-  const hasVibeCheck = user.vibe_checks && user.vibe_checks.length > 0;
+  const hasVibeCheck = cleanVibeChecks(user.vibe_checks).length > 0;
 
   /* ================= GALLERY ================= */
   if (galleryCount >= 9) {
@@ -536,5 +555,7 @@ export default {
   getRemainingTime,
   dataHelper,
   calculateProfileCompletion,
-  checkAndNotifyProfileCompletion
+  checkAndNotifyProfileCompletion,
+  isMeaningfulAnswer,
+  cleanVibeChecks
 };

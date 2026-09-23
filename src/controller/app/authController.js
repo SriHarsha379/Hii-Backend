@@ -646,7 +646,7 @@ const signupStepThree = async (req, res) => {
         user.custom_vibes = customVibesArr;
 
         // ✅ save structured vibe checks (ONLY id + answer)
-        user.vibe_checks = vibeChecksArr.map(vc => ({
+        user.vibe_checks = helper.cleanVibeChecks(vibeChecksArr).map(vc => ({
             question_id: vc.question_id || null,
             answer: vc.answer || null
         }));
