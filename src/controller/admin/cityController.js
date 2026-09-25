@@ -60,9 +60,15 @@ const createCity = async (req, res) => {
 // Always sorted alphabetically by city name (not creation order).
 const getCity = async (req, res) => {
     try {
-        const filter = req.query.include_inactive === 'true'
+        // Client rule: admin dropdowns (clubs, events, ads, users, club /
+        // organiser signup...) show ONLY the preferred cities - the ones the
+        // business operates in (starred in Manage Filters > Cities).
+        // ?scope=all -> every city, for Manage Filters > Cities itself.
+        // (Members' app list is separate: auth/popular_cities shows every
+        // city that is 'shown in app'.)
+        const filter = req.query.scope === 'all'
             ? { is_deleted: false }
-            : { is_active: true, is_deleted: false };
+            : { is_preferred: true, is_deleted: false };
 
         const city = await City.find(filter)
             .populate({
@@ -204,4 +210,28 @@ const toggleCityStatus = async (req, res) => {
     }
 };
 
-export default { createCity, getCity, updateCity, deleteCity, toggleCityStatus }
+
+// POST /city/toggle_preferred/:id - star / un-star a preferred city.
+const togglePreferredCity = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const city = await City.findOne({ _id: id, is_deleted: false });
+        if (!city) {
+            return apiResponse.notFoundResponse(res, messages.CITY_NOT_FOUND);
+        }
+        city.is_preferred = !city.is_preferred;
+        await city.save();
+        await logActivity(req, {
+            action: "UPDATE",
+            resource: "City",
+            resource_id: city._id,
+            details: `${city.is_preferred ? "Marked" : "Unmarked"} "${city.city_name}" as a preferred city`,
+        });
+        return apiResponse.ok(res, city, messages.SUCCESS);
+    } catch (err) {
+        console.error(err);
+        return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+    }
+};
+
+export default { createCity, getCity, updateCity, deleteCity, toggleCityStatus, togglePreferredCity }

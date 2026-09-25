@@ -63,6 +63,8 @@ const UserSchema = new mongoose.Schema(
     // still gets nudged periodically, not just people who trigger an edit
     // or bring the app to the foreground.
     last_profile_reminder_sent_at: { type: Date, default: null },
+    // how many profile-completion pushes this member has had (capped)
+    profile_reminder_count: { type: Number, default: 0 },
 
     otp: {
       code: { type: String },

@@ -13,6 +13,7 @@ route
   .post('/create_city', adminauth, upload.single("city_image"), validate(city_schema), cityController.createCity)
   .put('/update_city/:id', adminauth, upload.single("city_image"), cityController.updateCity)
   .post('/toggle_status/:id', adminauth, cityController.toggleCityStatus)
+  .post('/toggle_preferred/:id', adminauth, cityController.togglePreferredCity)
   .delete('/delete_city/:id', adminauth, cityController.deleteCity);
 
 export default route;

@@ -89,10 +89,10 @@ server.listen(PORT, () => {
   // (edit-triggered push, and the Flutter local notification on
   // open/resume). See src/cron/profileCompletionReminderJob.js.
   startProfileCompletionReminderJob();
-  console.log(`✅ Profile completion reminder cron scheduled (daily, 18:00 server time)`);
+  console.log(`✅ Profile completion reminder cron scheduled (daily, 18:00 India time)`);
 
   // Client's ask: "app notifications when a member is not active on the
   // app." See src/cron/inactiveMemberReminderJob.js.
   startInactiveMemberReminderJob();
-  console.log(`✅ Inactive member reminder cron scheduled (daily, 19:00 server time)`);
+  console.log(`✅ Inactive member reminder cron scheduled (daily, 19:00 India time)`);
 });

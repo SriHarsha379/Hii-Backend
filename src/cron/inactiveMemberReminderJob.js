@@ -3,96 +3,95 @@ import { User } from "../model/index.js";
 import sendNotification from "../utility/notification.js";
 
 /* =====================================================================
-   INACTIVE MEMBER REMINDER
-   =====================================================================
-   Client's ask: "We need to have app notifications when a member is not
-   active on the app." Nothing on the User schema tracked activity at all
-   before this — see last_active_at (set in appAuth middleware) and this
-   cron, which is the first thing that actually reads it.
-
-   Same structural pattern as profileCompletionReminderJob.js: daily,
-   batched, per-user cooldown via its own timestamp field, one bad user
-   never blocks the rest of the batch.
+   INACTIVE MEMBER REMINDER  ("We miss you 👋")
+   Client ask: "app notifications when a member is not active on the app".
+   - Inactive = no app activity for INACTIVITY_DAYS (last_active_at is set by
+     appAuth). Members from before activity tracking existed have no
+     last_active_at - for them, when their account last changed is used.
+   - At most one nudge every COOLDOWN_DAYS per member.
+   - Runs daily at 19:00 India time (APP_TIMEZONE), processes everyone due
+     (in batches), and "claims" each member before sending so two server
+     processes can never send the same person two notifications.
    ===================================================================== */
-
-// "Inactive" = no authenticated app request in this many days. 5 days is
-// a deliberate middle ground — long enough that it's a genuine lapse
-// rather than someone who just checked yesterday, short enough that the
-// nudge still lands while they might plausibly remember the app.
-const INACTIVITY_THRESHOLD_MS = 5 * 24 * 60 * 60 * 1000;
-
-// Don't re-nudge someone every single day just because they're still
-// inactive — once every 7 days is a nudge, not a nag.
-const REMINDER_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-
+const TZ = process.env.APP_TIMEZONE || "Asia/Kolkata";
+const DAY_MS = 24 * 60 * 60 * 1000;
+const INACTIVITY_DAYS = 5;
+const COOLDOWN_DAYS = 7;
 const BATCH_SIZE = 200;
+const MAX_PER_RUN = 5000;
 const PER_USER_DELAY_MS = 50;
-
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const runInactiveMemberReminderJob = async () => {
-  const inactiveCutoff = new Date(Date.now() - INACTIVITY_THRESHOLD_MS);
-  const cooldownCutoff = new Date(Date.now() - REMINDER_COOLDOWN_MS);
-
-  const candidates = await User.find({
-    is_deleted: false,
-    is_active: true,
-    is_profile_completed: true, // don't nudge someone mid-onboarding
-    player_id: { $ne: null, $exists: true },
-    last_active_at: { $lte: inactiveCutoff },
+const runInactiveMemberReminderJob = async ({ dryRun = false } = {}) => {
+  const inactiveCutoff = new Date(Date.now() - INACTIVITY_DAYS * DAY_MS);
+  const cooldownCutoff = new Date(Date.now() - COOLDOWN_DAYS * DAY_MS);
+  const notRecentlyNudged = {
     $or: [
       { last_inactivity_nudge_sent_at: null },
       { last_inactivity_nudge_sent_at: { $lte: cooldownCutoff } },
     ],
-  })
-    .select("_id player_id last_active_at")
-    .limit(BATCH_SIZE)
-    .lean();
+  };
+  const filter = {
+    is_deleted: false,
+    is_active: true,
+    is_profile_completed: true, // don't nudge someone mid-onboarding
+    player_id: { $nin: [null, ""] },
+    $and: [
+      {
+        $or: [
+          { last_active_at: { $lte: inactiveCutoff } },
+          // members from before activity tracking existed
+          { last_active_at: null, updatedAt: { $lte: inactiveCutoff } },
+        ],
+      },
+      notRecentlyNudged,
+    ],
+  };
 
-  let sent = 0;
+  let processed = 0, sent = 0, lastId = null;
+  while (processed < MAX_PER_RUN) {
+    const page = await User.find(lastId ? { ...filter, _id: { $gt: lastId } } : filter)
+      .sort({ _id: 1 })
+      .select("_id player_id")
+      .limit(BATCH_SIZE)
+      .lean();
+    if (!page.length) break;
 
-  for (const user of candidates) {
-    try {
-      await sendNotification(
-        "inactivity_reminder",
-        user.player_id,
-        {
-          senderId: user._id,
-          other_user_id: user._id,
-          action: "inactivity_reminder",
-        },
-        0
-      );
-
-      await User.updateOne(
-        { _id: user._id },
-        { $set: { last_inactivity_nudge_sent_at: new Date() } }
-      );
-
-      sent += 1;
-      await delay(PER_USER_DELAY_MS);
-    } catch (err) {
-      console.error(
-        `[inactiveMemberReminderJob] failed for user ${user._id}:`,
-        err.message
-      );
+    for (const user of page) {
+      lastId = user._id;
+      processed += 1;
+      if (dryRun) { sent += 1; continue; }
+      try {
+        // Claim first: only one process can flip this, so no double sends.
+        const claim = await User.updateOne(
+          { _id: user._id, ...notRecentlyNudged },
+          { $set: { last_inactivity_nudge_sent_at: new Date() } }
+        );
+        if (!claim.modifiedCount) continue;
+        await sendNotification(
+          "inactivity_reminder",
+          user.player_id,
+          { senderId: user._id, other_user_id: user._id, action: "inactivity_reminder" },
+          0
+        );
+        sent += 1;
+        await delay(PER_USER_DELAY_MS);
+      } catch (err) {
+        console.error(`[inactiveMemberReminderJob] failed for user ${user._id}:`, err.message);
+      }
     }
   }
-
-  console.log(
-    `[inactiveMemberReminderJob] processed ${candidates.length} candidate(s), sent ${sent} reminder(s).`
-  );
+  console.log(`[inactiveMemberReminderJob]${dryRun ? " (dry run)" : ""} ${processed} due, ${sent} ${dryRun ? "would be sent" : "sent"}.`);
+  return { processed, sent };
 };
 
-// Runs once daily at 19:00 server time — an hour after the profile-
-// completion reminder (18:00), so the two batch jobs don't compete for
-// the same DB/Firebase resources simultaneously.
 const startInactiveMemberReminderJob = () => {
-  cron.schedule("0 19 * * *", () => {
-    runInactiveMemberReminderJob().catch((err) => {
-      console.error("[inactiveMemberReminderJob] run failed:", err.message);
-    });
-  });
+  cron.schedule(
+    "0 19 * * *",
+    () => runInactiveMemberReminderJob().catch((err) =>
+      console.error("[inactiveMemberReminderJob] run failed:", err.message)),
+    { timezone: TZ, noOverlap: true, name: "inactive-member-reminder" }
+  );
 };
 
 export { startInactiveMemberReminderJob, runInactiveMemberReminderJob };
