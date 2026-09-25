@@ -3,6 +3,7 @@ import { Ticket, Venue, Event, Coupon, Booking, User, Commission, Friendship } f
 import apiResponse from "../../utility/apiResponse.js"
 import messages from "../../utility/messages.js"
 import sendNotification from "../../utility/notification.js";
+import { notifyVendorAdmins } from "../../utility/adminNotify.js";
 
 // Get event Tickets
 const getEventTickets = async (req, res) => {
@@ -310,6 +311,14 @@ const createEventBooking = async (req, res) => {
         0
       );
     }
+
+    // -> the event organiser's dashboard (Bookings page).
+    notifyVendorAdmins(vendorId, {
+      title: 'New ticket booking 🎟️',
+      message: `${totalQuantity} ticket(s) booked for ${event.venue_name || 'your event'}.`,
+      action: 'new_booking',
+      action_json: { booking_id: booking[0]._id, booking_type: 'event' },
+    });
 
     return apiResponse.ok(
       res,
@@ -686,6 +695,14 @@ const createVenueBooking = async (req, res) => {
       );
     }
 
+    // -> the club's dashboard (Bookings page).
+    notifyVendorAdmins(venue.vendor_id, {
+      title: 'New table reservation 🍸',
+      message: `${user?.name || 'A member'} reserved a table at ${venue.venue_name || 'your venue'}.`,
+      action: 'new_booking',
+      action_json: { booking_id: booking._id, booking_type: 'venue' },
+    });
+
     /* ================= NOTIFY INVITED FRIENDS ================= */
     if (validInvitedFriendIds.length > 0) {
       const invitedUsers = await User.find({
@@ -702,7 +719,7 @@ const createVenueBooking = async (req, res) => {
               {
                 type: 'venue_booking_invite',
                 senderId: userId,
-                other_user_id: userId,
+                other_user_id: u._id, // the invited friend - it goes in THEIR notification list
                 action: "venue_booking_invite",
                 booking_id: booking._id,
                 venue_id: venue._id,

@@ -9,6 +9,7 @@ import path from "path";
 import mongoose from "mongoose";
 import moment from "moment";
 import generateToken from "../../utility/generateToken.js";
+import { notifyMainAdmins } from "../../utility/adminNotify.js";
 dotenv.config();
 
 
@@ -463,6 +464,14 @@ const reportProblem = async (req, res) => {
       user_id: userId,
       description,
       attachments
+    });
+
+    // -> main admins (Support & Activity > Requests).
+    notifyMainAdmins({
+      title: 'New support request',
+      message: String(description || 'A member reported a problem.').slice(0, 120),
+      action: 'support_request',
+      action_json: { request_id: report._id },
     });
 
     return apiResponse.ok(

@@ -81,9 +81,16 @@ const sendNotification = async (type, playerId, extraData = {}, badge = 0) => {
       break;
 
     case 'broadcast':
-      message = `📢 Broadcast from ${extraData?.fullName || 'Admin'}
-        Title: "${extraData?.title}"
-        Message: ${extraData?.message || 'You got a new announcement'}`;
+      // The admin's own title and message, as written.
+      title = extraData?.title || 'Hii';
+      message = extraData?.message || 'You have a new announcement';
+      icon = '📢';
+      break;
+
+    case 'new_blog':
+      title = 'New on the Hii blog ✍️';
+      message = extraData?.blog_title || 'A new blog post is up - take a look.';
+      icon = '✍️';
       break;
 
 

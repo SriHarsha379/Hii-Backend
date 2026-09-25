@@ -8,6 +8,7 @@ import { updateVendorSchema } from "../../validation/admin/vendorValidation.js";
 import sendmail from "../../utility/sendmail.js"; // Add this import
 import logActivity from "../../utility/activityLogger.js";
 import vendorOtpController from "./vendorOtpController.js";
+import { notifyMainAdmins } from "../../utility/adminNotify.js";
 
 
 /* GET ALL VENDORS
@@ -257,6 +258,16 @@ const createVendor = async (req, res) => {
 
     // Create vendor
     const vendor = await Vendor.create(vendorData);
+
+    // Club / organiser self-signup -> main admins (Organiser Requests page).
+    if (req.user && req.user.role !== 'SUPER_ADMIN') {
+      notifyMainAdmins({
+        title: vendor_type === 'event_organizer' ? 'New event organiser signup' : 'New club signup',
+        message: `${vendor.name} is waiting for your approval.`,
+        action: 'organiser_request',
+        action_json: { vendor_id: vendor._id, vendor_type },
+      });
+    }
 
     console.log('✅ Vendor created successfully:', {
       id: vendor._id,

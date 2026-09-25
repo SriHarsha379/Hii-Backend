@@ -39,14 +39,16 @@ const addBlog = async (req, res) => {
                 await Promise.all(
                     users.map(user =>
                         sendNotification(
-                            process.env.SYSTEM_USER_ID || '68bfc207763a6ea41378177a', // sender/system ID
-                            user._id,      // target user ID
-                            user.player_id, // device/player ID
-
-                            title,
-                            message,
-                            action,
-                            action_data
+                            "new_blog",
+                            user.player_id,
+                            {
+                                senderId: process.env.SYSTEM_USER_ID || '68bfc207763a6ea41378177a',
+                                other_user_id: user._id,
+                                action: "new_blog",
+                                blog_id: data._id,
+                                blog_title: data.title,
+                            },
+                            0
                         ).catch(err => {
                             console.error(`Notification failed for user ${user._id}:`, err);
                         })

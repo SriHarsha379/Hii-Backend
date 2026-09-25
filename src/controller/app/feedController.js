@@ -3,6 +3,7 @@ import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import helper from "../../utility/helper.js"
 import sendNotification from "../../utility/notification.js";
+import { notifyMainAdmins } from "../../utility/adminNotify.js";
 
 
 const getHomeData = async (req, res) => {
@@ -1182,6 +1183,14 @@ const reportUser = async (req, res) => {
     await UserReport.create({
       reported_by: userId,
       reported_user: other_user_id
+    });
+
+    // -> main admins (Support & Activity > Complaints).
+    notifyMainAdmins({
+      title: 'Member reported',
+      message: 'A member has been reported - review it in Complaints.',
+      action: 'member_report',
+      action_json: { reported_user: other_user_id },
     });
 
     return apiResponse.ok(

@@ -3,6 +3,7 @@ import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import helper from "../../utility/helper.js";
 import dotenv from "dotenv";
+import { dashboardNotificationFilter } from "../../utility/adminNotify.js";
 dotenv.config();
 
 
@@ -67,11 +68,11 @@ const getVendorNotifications = async (req, res) => {
         // properties of undefined" for every single admin request. The
         // schema already has separate user_id/vendor_user_id fields for
         // exactly this distinction — just never branched on it.
-        const isVendorCaller = Boolean(req.vendor);
-        const identityId = isVendorCaller ? req.vendor._id : req.user?._id;
-        const identityField = isVendorCaller ? 'vendor_user_id' : 'user_id';
-
-        if (!identityId) {
+        // Admin logins see rows for their admin id, plus (club / event
+        // admins) rows for their club's Vendor id. Vendor logins see
+        // their Vendor rows. See utility/adminNotify.js.
+        const ownerFilter = await dashboardNotificationFilter(req);
+        if (!ownerFilter) {
             return apiResponse.badRequest(res, "Could not identify caller");
         }
 
@@ -80,13 +81,13 @@ const getVendorNotifications = async (req, res) => {
         const { limits, offset, pages } = helper.getPagination(page, limit);
         // 🔹 Count
         const totalCount = await Notification.countDocuments({
-            [identityField]: identityId,
+            ...ownerFilter,
             is_deleted: 0
         });
 
         // 🔹 Fetch
         const notifications = await Notification.find({
-            [identityField]: identityId,
+            ...ownerFilter,
             is_deleted: 0
         })
             .sort({ createdAt: -1 })
@@ -96,7 +97,7 @@ const getVendorNotifications = async (req, res) => {
         // 🔹 Mark all as read
         await Notification.updateMany(
             {
-                [identityField]: identityId,
+                ...ownerFilter,
                 is_deleted: 0,
                 read_status: 0
             },
@@ -118,7 +119,7 @@ const getVendorNotifications = async (req, res) => {
         return apiResponse.ok(res, {
             notifications: formatted,
             total_records: totalCount,
-            total_pages: Math.ceil(totalCount / limit),
+            total_pages: Math.ceil(totalCount / limits),
             current_page: Number(page)
         }, "Vendor notifications fetched");
 
@@ -130,16 +131,16 @@ const getVendorNotifications = async (req, res) => {
 const getVendorUnreadCount = async (req, res) => {
     try {
         // Same admin-vs-vendor identity fix as getVendorNotifications above.
-        const isVendorCaller = Boolean(req.vendor);
-        const identityId = isVendorCaller ? req.vendor._id : req.user?._id;
-        const identityField = isVendorCaller ? 'vendor_user_id' : 'user_id';
-
-        if (!identityId) {
+        // Admin logins see rows for their admin id, plus (club / event
+        // admins) rows for their club's Vendor id. Vendor logins see
+        // their Vendor rows. See utility/adminNotify.js.
+        const ownerFilter = await dashboardNotificationFilter(req);
+        if (!ownerFilter) {
             return apiResponse.badRequest(res, "Could not identify caller");
         }
 
         const unreadCount = await Notification.countDocuments({
-            [identityField]: identityId,
+            ...ownerFilter,
             is_deleted: 0,
             read_status: 0
         });
