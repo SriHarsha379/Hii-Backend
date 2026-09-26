@@ -7,12 +7,20 @@ dotenv.config();
 const createAdmin = async () => {
     try {
         // connect to DB
-        await mongoose.connect('mongodb+srv://dev_db_user:FlhcqjbyH1HauTmb@cluster0.vcucve0.mongodb.net/nightlifeDB');
+        await mongoose.connect(process.env.MONGO_URI);
         console.log("✅ MongoDB connected");
 
         const email = "admin@gmail.com";   // change as needed
-        const password = "Admin@123";        // change as needed
+        const password = process.env.NEW_ADMIN_PASSWORD; // run: NEW_ADMIN_PASSWORD=... node src/scripts/createAdmin.js
 
+        if (!password || password.length < 10) {
+            console.log("Set NEW_ADMIN_PASSWORD (10+ characters) when running this script.");
+            process.exit(1);
+        }
+        if (!password || password.length < 10) {
+            console.log("Set NEW_ADMIN_PASSWORD (10+ characters) when running this script.");
+            process.exit(1);
+        }
         // check if admin already exists
         const existingAdmin = await Admin.findOne({ email });
         if (existingAdmin) {

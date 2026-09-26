@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 // === MongoDB Export Script ===
 // Run: node exportAllDatabase.js
 
@@ -5,7 +7,7 @@ import { MongoClient } from "mongodb";
 import fs from "fs";
 import path from "path";
 
-const uri = "mongodb+srv://dev_db_user:FlhcqjbyH1HauTmb@cluster0.vcucve0.mongodb.net/nightlifeDB"
+const uri = process.env.MONGO_URI
 const outputDir = "dbjson";
 
 // === CONFIG ===

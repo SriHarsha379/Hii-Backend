@@ -464,7 +464,8 @@ const filterEventsVenues = async (req, res) => {
         _id: { $nin: excludedIds },
         is_deleted: false,
         is_active: true,
-        is_profile_completed: true
+        is_profile_completed: true,
+        my_visibility: { $ne: false }, // respect "hide my profile"
       })
         .select("name bio profile_image latitude longitude music_genre custom_music_genres createdAt")
         .populate("music_genre", "name")

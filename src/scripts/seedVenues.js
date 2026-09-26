@@ -46,7 +46,7 @@ import Vendor from "../model/VendorModel.js";
 
 const MONGO_URI =
   process.env.MONGO_URI ||
-  "mongodb+srv://harshas379_db_user:test1234@cluster0.auiuvqn.mongodb.net/nightlifeDB";
+  process.env.MONGO_URI;
 
 const COLLECTIONS = {
   categories: "categories",

@@ -224,6 +224,7 @@ const getHomeData = async (req, res) => {
         is_deleted: false,
         is_active: true,
         is_profile_completed: true,
+        my_visibility: { $ne: false }, // respect "hide my profile"
         _id: {
           $ne: userId,
           $nin: Array.from(excludedUserIds)

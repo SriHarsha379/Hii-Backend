@@ -41,7 +41,7 @@ import User from "../model/userModel.js";
 
 const MONGO_URI =
   process.env.MONGO_URI ||
-  "mongodb+srv://harshas379_db_user:test1234@cluster0.auiuvqn.mongodb.net/nightlifeDB";
+  process.env.MONGO_URI;
 
 // Collection names assume default mongoose pluralization
 // (Genre -> genres, Category -> categories, Vibe -> vibes,
