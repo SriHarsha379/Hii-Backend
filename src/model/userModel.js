@@ -80,6 +80,7 @@ const UserSchema = new mongoose.Schema(
 
     forget_otp: { type: String },
     is_forget_otp: { type: Boolean, default: false },
+    forget_otp_attempts: { type: Number, default: 0 }, // wrong tries on the current code
 
     /* ================= NOTIFICATIONS ================= */
 

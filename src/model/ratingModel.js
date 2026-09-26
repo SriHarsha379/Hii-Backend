@@ -34,5 +34,8 @@ const RatingSchema = new mongoose.Schema(
 );
 
 
+// One rating per member per booking (backstop for the check in ratingController).
+RatingSchema.index({ booking_id: 1, user_id: 1 }, { unique: true });
+
 const Rating = mongoose.model("Rating", RatingSchema);
 export default Rating;

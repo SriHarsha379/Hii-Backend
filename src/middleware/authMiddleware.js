@@ -4,6 +4,11 @@ import apiResponse from "../utility/apiResponse.js";
 import messages from "../utility/messages.js";
 
 
+
+// A deleted or deactivated admin must lose access at once (their token
+// would otherwise keep working for up to 300 days).
+const adminDisabled = (admin) => Boolean(admin && (admin.is_deleted === true || admin.is_active === false));
+
 const adminauth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -17,6 +22,7 @@ const adminauth = async (req, res, next) => {
     const admin = await Admin.findById(decoded.id).select("-password");
     if (!admin) return apiResponse.forbidden(res, messages.FORBIDDEN);
 
+    if (adminDisabled(admin)) return apiResponse.forbidden(res, ["This admin account has been disabled."]);
     req.user = admin;
     next();
   } catch (err) {
@@ -101,6 +107,7 @@ const allowAdminOrVendor = async (req, res, next) => {
     if (decoded?.id) {
       const admin = await Admin.findById(decoded.id).select("-password");
       if (admin) {
+        if (adminDisabled(admin)) return apiResponse.forbidden(res, ["This admin account has been disabled."]);
         req.user = admin;
         return next();
       }

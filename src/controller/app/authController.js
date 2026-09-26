@@ -148,7 +148,6 @@ const signupStepOne = async (req, res) => {
             const userData = await helper.getUserData(existingSocialUser._id);
             userData.signup_step = 1;
             userData.is_new_user = true;
-            userData.otp = otpCode; // 👈 static OTP in response
 
             return apiResponse.ok(res, userData, messages.MSG_OTP_SENT);
         }
@@ -210,7 +209,19 @@ const signupStepOne = async (req, res) => {
         const otpCode = "1234";
         const otpExpiry = new Date(Date.now() + 30 * 60 * 1000);
 
-        const user = await User.create({
+        // Retrying signup (e.g. the OTP step failed, or the member went back)
+        // must REUSE their unfinished account - creating a new one every time
+        // broke on the unique-email rule ("Server error") and left duplicate
+        // half-finished accounts for the same phone number.
+        const unfinishedUser =
+            (existingPhoneUser && !existingPhoneUser.is_verified) ? existingPhoneUser :
+            (emailExists && !emailExists.is_verified) ? emailExists : null;
+        if (unfinishedUser && emailExists && !emailExists.is_verified &&
+            String(emailExists._id) !== String(unfinishedUser._id)) {
+            // two abandoned attempts (same email, different phone): drop the stale one
+            await User.deleteOne({ _id: emailExists._id, is_verified: false });
+        }
+        const signupFields = {
             phone_number: cleanPhone,
             username: cleanUsername,
             email: cleanEmail,
@@ -233,12 +244,18 @@ const signupStepOne = async (req, res) => {
             signup_step: 1,
             is_profile_completed: false,
             is_verified: false
-        });
+        };
+        let user;
+        if (unfinishedUser) {
+            Object.assign(unfinishedUser, signupFields); // password is re-hashed on save
+            user = await unfinishedUser.save();
+        } else {
+            user = await User.create(signupFields);
+        }
 
         const userData = await helper.getUserData(user._id);
         userData.signup_step = 1;
         userData.is_new_user = true;
-        userData.otp = otpCode;
 
         return apiResponse.ok(res, userData, messages.MSG_OTP_SENT);
 
@@ -265,7 +282,7 @@ const otpVerify = async (req, res) => {
         } catch (firebaseError) {
             console.error("FIREBASE VERIFY ERROR:", firebaseError.code, firebaseError.message);
             // TEMP DEBUG — remove after diagnosing
-            return apiResponse.badRequest(res, `DEBUG: Firebase verify failed - ${firebaseError.code} - ${firebaseError.message}`);
+            return apiResponse.badRequest(res, ["Phone verification failed. Please request a new OTP and try again."]);
         }
         // Ensure the verified phone number matches the one being signed up
         const verifiedFirebasePhone = decodedToken.phone_number || '';
@@ -274,7 +291,7 @@ const otpVerify = async (req, res) => {
         console.log("PHONE CHECK:", { verifiedFirebasePhone, normalizedVerified, normalizedRequested });
         if (!normalizedVerified || normalizedVerified !== normalizedRequested) {
             // TEMP DEBUG — remove after diagnosing
-            return apiResponse.badRequest(res, `DEBUG: Phone mismatch - verified="${verifiedFirebasePhone}" requested="${cleanPhoneNumber}"`);
+            return apiResponse.badRequest(res, ["This isn't the phone number you verified. Please check the number and try again."]);
         }
         /* ================= FIND USER ================= */
         const user = await User.findOne({
@@ -333,7 +350,7 @@ const resendOtp = async (req, res) => {
             { $set: { otp: { code: otp, expires_at }, updatedAt: Date.now() } }
         )
 
-        return apiResponse.ok(res, { otp }, messages.MSG_OTP_SENT)
+        return apiResponse.ok(res, {}, messages.MSG_OTP_SENT) // code is sent by SMS (Firebase), never returned
     } catch (error) {
         return apiResponse.serverError(res, messages.SERVER_ERROR, error.message)
     }
@@ -1047,10 +1064,13 @@ const forgotPassword = async (req, res) => {
         user.forget_otp = otpCode;
         user.is_forget_otp = true;
         user.expiry_time_otp = otpExpiry;
+        user.forget_otp_attempts = 0;
         await user.save();
 
         /* ================= SEND OTP ON EMAIL ================= */
-        if (email) {
+        // Always to the account's email - also when they typed their phone
+        // number (the backend has no SMS, so a phone code was never delivered).
+        if (user.email) {
             const mailBody = utility.mailBodyEmailOtp({
                 app_name: process.env.APP_NAME,
                 app_logo: process.env.APP_LOGO,
@@ -1102,8 +1122,21 @@ const verifyForgotOtp = async (req, res) => {
         if (!user.is_forget_otp)
             return apiResponse.badRequest(res, messages.OTP_NOT_REQUESTED);
 
-        if (user.forget_otp !== otp)
+        if (user.forget_otp !== String(otp)) {
+            // Max 5 wrong tries per code - otherwise a script could try all
+            // 10,000 four-digit codes and take over the account.
+            user.forget_otp_attempts = (user.forget_otp_attempts || 0) + 1;
+            if (user.forget_otp_attempts >= 5) {
+                user.forget_otp = null;
+                user.is_forget_otp = false;
+                user.expiry_time_otp = null;
+                user.forget_otp_attempts = 0;
+                await user.save();
+                return apiResponse.badRequest(res, ["Too many wrong attempts. Please request a new code."]);
+            }
+            await user.save();
             return apiResponse.badRequest(res, messages.WRONG_OTP);
+        }
 
         if (user.expiry_time_otp < new Date())
             return apiResponse.badRequest(res, messages.OTP_EXPIRED);
@@ -1112,6 +1145,7 @@ const verifyForgotOtp = async (req, res) => {
         user.forget_otp = null;
         user.is_forget_otp = false;
         user.expiry_time_otp = null;
+        user.forget_otp_attempts = 0;
         await user.save();
 
         /* ================= TOKEN ================= */
@@ -1152,10 +1186,13 @@ const resendForgotOtp = async (req, res) => {
         user.forget_otp = otpCode;
         user.is_forget_otp = true;
         user.expiry_time_otp = otpExpiry;
+        user.forget_otp_attempts = 0;
         await user.save();
 
         /* ================= SEND EMAIL ================= */
-        if (email) {
+        // Always to the account's email - also when they typed their phone
+        // number (the backend has no SMS, so a phone code was never delivered).
+        if (user.email) {
             const mailBody = utility.mailBodyEmailOtp({
                 app_name: process.env.APP_NAME,
                 app_logo: process.env.APP_LOGO,
@@ -1173,8 +1210,7 @@ const resendForgotOtp = async (req, res) => {
         return apiResponse.ok(
             res,
             {
-                type: email ? "email" : "phone",
-                otp: otpCode
+                type: email ? "email" : "phone"
             },
             messages.MSG_OTP_SENT
         );

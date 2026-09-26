@@ -27,27 +27,25 @@ const storage = multer.diskStorage({
   },
 });
 
-// ✅ Allow images + videos
+// Allowed file types, matched EXACTLY on the extension. No SVG: an SVG can
+// contain JavaScript, and uploads are served from our own domain.
+const ALLOWED_EXTENSIONS = new Set([
+  "jpeg", "jpg", "png", "gif", "webp", "bmp", "tif", "tiff", "ico", "avif",
+  "heic", "heif", "jfif", "pjpeg", "pjp", "apng",
+  "mp4", "mov", "avi", "mkv", "webm",
+]);
 const fileFilter = (req, file, cb) => {
-  const imageTypes = /jpeg|jpg|png|gif|webp|bmp|tiff|tif|svg|ico|avif|heic|heif|jfif|pjpeg|pjp|apng|giff/i;
-  const videoTypes = /mp4|mov|avi|mkv|webm/;
-
   const ext = path.extname(file.originalname).toLowerCase().substring(1);
-
-  if (imageTypes.test(ext) || videoTypes.test(ext)) {
+  if (ALLOWED_EXTENSIONS.has(ext)) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        "Only image and video files are allowed (jpg, png, webp, mp4, mov)"
-      )
-    );
+    cb(new Error("Only image and video files are allowed (jpg, png, webp, mp4, mov)"));
   }
 };
 
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB (was 500 MB)
   fileFilter,
 });
 

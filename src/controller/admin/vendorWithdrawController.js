@@ -596,6 +596,17 @@ const requestWithdraw = async (req, res) => {
   try {
     const vendorId = req.vendor._id;
 
+    // Payments are phase 2: with no gateway, bookings count as "paid" by
+    // default, so earnings aren't real money yet. Enable with
+    // WITHDRAWALS_ENABLED=true once online payments are live.
+    if (process.env.WITHDRAWALS_ENABLED !== "true") {
+      return apiResponse.badRequest(res, "Withdrawals open once online payments go live.");
+    }
+    // One pending request at a time (two sent at once could both pass the balance check).
+    if (await WithdrawRequest.exists({ vendor_id: vendorId, status: "pending" })) {
+      return apiResponse.badRequest(res, "You already have a withdrawal request waiting for approval.");
+    }
+
     const {
       amount,
       description,

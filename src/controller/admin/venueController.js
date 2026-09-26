@@ -1,6 +1,7 @@
 import { Venue, Category } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import { manageableVendorIds, ownershipFilter, isMainAdmin } from "../../utility/adminScope.js";
 
 // ---------------- CHECK IF VENDOR ALREADY HAS A VENUE ------------------
 const checkVendorVenueExists = async (vendorId, excludeId = null) => {
@@ -25,6 +26,13 @@ const createVenue = async (req, res) => {
     // (allowAdminOrVendor) and must specify which vendor/club this venue
     // belongs to via `vendor_id` in the body — same fix applied to events.
     const vendorId = req.vendor ? req.vendor._id : req.body.vendor_id;
+    {
+      // Club / event admins may only create for their own club.
+      const allowed = await manageableVendorIds(req);
+      if (vendorId && allowed && !allowed.map(String).includes(String(vendorId))) {
+        return apiResponse.forbidden(res, messages.FORBIDDEN);
+      }
+    }
 
     if (!vendorId) {
       return apiResponse.badRequest(
@@ -192,9 +200,8 @@ const updateVenue = async (req, res) => {
     } = req.body;
 
     // Vendors can only edit their own venue; admins can edit any venue.
-    const lookupFilter = req.vendor
-      ? { _id: id, vendor_id: req.vendor._id }
-      : { _id: id };
+    // Main admins: any; club / event admins and vendors: only their own.
+    const lookupFilter = { _id: id, ...(await ownershipFilter(req)) };
 
     const venueExists = await Venue.findOne(lookupFilter);
 
@@ -398,9 +405,8 @@ const getVenueById = async (req, res) => {
 const deleteVenue = async (req, res) => {
   try {
     // Vendors can only delete their own venue; admins can delete any venue.
-    const lookupFilter = req.vendor
-      ? { _id: req.params.id, vendor_id: req.vendor._id }
-      : { _id: req.params.id };
+    // Main admins: any; club / event admins and vendors: only their own.
+    const lookupFilter = { _id: req.params.id, ...(await ownershipFilter(req)) };
 
     const deletedVenue = await Venue.findOneAndUpdate(
       lookupFilter,
@@ -425,6 +431,8 @@ const deleteVenue = async (req, res) => {
    city scope. */
 const featureVenue = async (req, res) => {
   try {
+    // Featuring puts a club at the top of the app - main admins only.
+    if (!isMainAdmin(req)) return apiResponse.forbidden(res, messages.FORBIDDEN);
     const { id } = req.params;
     const { duration, city } = req.body;
 
@@ -446,6 +454,8 @@ const featureVenue = async (req, res) => {
 
 const unfeatureVenue = async (req, res) => {
   try {
+    // Featuring puts a club at the top of the app - main admins only.
+    if (!isMainAdmin(req)) return apiResponse.forbidden(res, messages.FORBIDDEN);
     const { id } = req.params;
     const venue = await Venue.findOneAndUpdate(
       { _id: id, is_deleted: false },

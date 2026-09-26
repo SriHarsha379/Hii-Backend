@@ -1,5 +1,6 @@
 /** @format */
-import { WithdrawRequest, Notification } from "../../model/index.js";
+import { WithdrawRequest, Notification, Booking } from "../../model/index.js";
+import { isMainAdmin, manageableVendorIds } from "../../utility/adminScope.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 
@@ -10,7 +11,11 @@ const getAllWithdraws = async (req, res) => {
   try {
     console.log('📥 Fetching all withdrawal requests for admin...');
 
-    const list = await WithdrawRequest.find({})
+    // Main admins: every club. Club / event admins and vendors: their own
+    // only (the list includes bank account details).
+    const scopeIds = await manageableVendorIds(req);
+    const listFilter = scopeIds === null ? {} : { vendor_id: { $in: scopeIds } };
+    const list = await WithdrawRequest.find(listFilter)
       .populate("vendor_id", "name email phone_number business_image")
       .sort({ createdAt: -1 });
 
@@ -68,6 +73,8 @@ const getAllWithdraws = async (req, res) => {
 // =========================
 const approveWithdraw = async (req, res) => {
   try {
+    // Money decisions: main admins only (any admin login could, incl. club admins).
+    if (!isMainAdmin(req)) return apiResponse.forbidden(res, messages.FORBIDDEN);
     const { id } = req.params;
     const { transaction_id } = req.body;
     const adminId = req.admin?._id || req.user?._id;
@@ -91,6 +98,26 @@ const approveWithdraw = async (req, res) => {
         res,
         `Cannot approve ${withdrawal.status} request`
       );
+    }
+
+    if (process.env.WITHDRAWALS_ENABLED !== "true") {
+      return apiResponse.badRequest(res, "Withdrawals open once online payments go live.");
+    }
+    // Re-check the club's balance now (not just when the request was made).
+    const earnedRows = await Booking.find({
+      vendor_id: withdrawal.vendor_id,
+      payment_status: "success",
+      booking_status: { $in: ["confirmed", "completed"] },
+      is_deleted: false,
+    }).select("sub_total admin_earning").lean();
+    const earned = earnedRows.reduce((sum, b) => sum + (b.sub_total || 0) - (b.admin_earning || 0), 0);
+    const paidAgg = await WithdrawRequest.aggregate([
+      { $match: { vendor_id: withdrawal.vendor_id, status: "approved" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+    const alreadyPaid = paidAgg[0]?.total || 0;
+    if (alreadyPaid + Number(withdrawal.amount || 0) > earned + 0.01) {
+      return apiResponse.badRequest(res, `Can't approve: the club has only ${Math.max(0, earned - alreadyPaid).toFixed(2)} available.`);
     }
 
     // Update withdrawal
@@ -146,6 +173,8 @@ const approveWithdraw = async (req, res) => {
 // =========================
 const rejectWithdraw = async (req, res) => {
   try {
+    // Money decisions: main admins only (any admin login could, incl. club admins).
+    if (!isMainAdmin(req)) return apiResponse.forbidden(res, messages.FORBIDDEN);
     const { id } = req.params;
     const { reject_reason } = req.body;
     const adminId = req.admin?._id || req.user?._id;

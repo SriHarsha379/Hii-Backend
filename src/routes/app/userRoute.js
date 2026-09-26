@@ -6,6 +6,7 @@ import admin from "firebase-admin";
 
 const route = express.Router();
 route
+  .post("/update_player_id", appAuth, userController.updatePlayerId)
   .post("/edit_profile", appAuth, upload.single("profile_image"), userController.editProfile)
   .post("/update_profile_visibility", appAuth, userController.updateProfileVisibility)
   .post("/update_gallery_visibility", appAuth, userController.updateGalleryItemVisibility)

@@ -36,6 +36,9 @@ const loginAdmin = async (req, res) => {
     if (!isMatch) {
       return apiResponse.unauthorized(res, "Invalid email or password");
     }
+    if (admin.is_deleted === true || admin.is_active === false) {
+      return apiResponse.unauthorized(res, "This admin account has been disabled.");
+    }
 
     // NEW: if this admin has 2FA enabled, don't issue the real session
     // token yet — issue a short-lived "pending" token instead (5 minute

@@ -4,6 +4,7 @@ import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 // import { getCommissionPercent } from "../../utility/commissionUtility.js";
 import ticketController from "./ticketController.js";
+import { manageableVendorIds, ownershipFilter, isMainAdmin } from "../../utility/adminScope.js";
 
 // Helper to determine vendor filter (vendor user vs admin).
 // FIXED: previously "isAdmin" meant "see every booking platform-wide" —
@@ -13,18 +14,24 @@ import ticketController from "./ticketController.js";
 // bookings for their own venue. Now respects an explicit ?vendor_id= query
 // param when the caller is an admin, so the Club Admin dashboard can scope
 // itself instead of accidentally seeing every vendor's bookings.
-const resolveVendorFilter = (req) => {
+// Which club's bookings may this caller see / change? Decided on the server:
+// main admins may pick any club via ?vendor_id= (or see all); club / event
+// admins ALWAYS get their own club, whatever the request says (it used to
+// trust ?vendor_id=, so a club admin could manage any club's bookings).
+const resolveVendorFilter = async (req) => {
     if (req.vendor?._id) return { vendorId: req.vendor._id, isAdmin: false };
     const isAdmin = !!req.user;
-    const vendorId = isAdmin && req.query.vendor_id ? req.query.vendor_id : null;
-    return { vendorId, isAdmin };
+    const allowed = await manageableVendorIds(req);
+    if (allowed === null) return { vendorId: req.query.vendor_id || null, isAdmin };
+    const wanted = allowed.find((v) => String(v) === String(req.query.vendor_id));
+    return { vendorId: wanted || allowed[0] || "000000000000000000000000", isAdmin };
 };
 
 
 // ✅ Get all bookings (vendor sees own; admin sees all)
 const getAllBooking = async (req, res) => {
     try {
-        const { vendorId } = resolveVendorFilter(req);
+        const { vendorId } = await resolveVendorFilter(req);
         const { type } = req.query; // 'event' या 'venue'
 
         const query = { is_deleted: false };
@@ -138,7 +145,7 @@ const getAllBooking = async (req, res) => {
 // ✅ Get booking by ID
 const getBookingById = async (req, res) => {
     try {
-        const { vendorId } = resolveVendorFilter(req);
+        const { vendorId } = await resolveVendorFilter(req);
         const { id } = req.params;
 
         const query = { _id: id, is_deleted: false };
@@ -273,7 +280,7 @@ const getBookingById = async (req, res) => {
 // ✅ Get bookings by event ID
 const getEventBookings = async (req, res) => {
     try {
-        const { vendorId } = resolveVendorFilter(req);
+        const { vendorId } = await resolveVendorFilter(req);
         const { id } = req.params;
 
         // First get the event
@@ -323,7 +330,7 @@ const updateBookingStatus = async (req, res) => {
         // admin-role caller (req.vendor is only set for vendor tokens) —
         // same gap already fixed on Events/Venues, now relevant here too
         // since the route was just opened up to allowAdminOrVendor.
-        const { vendorId } = resolveVendorFilter(req);
+        const { vendorId } = await resolveVendorFilter(req);
         const { id } = req.params;
         const { status, notes } = req.body;
 
@@ -444,7 +451,7 @@ const deleteBooking = async (req, res) => {
 // ✅ Get booking statistics
 const getBookingStats = async (req, res) => {
     try {
-        const { vendorId } = resolveVendorFilter(req);
+        const { vendorId } = await resolveVendorFilter(req);
 
         const baseMatch = { is_deleted: false };
         if (vendorId) baseMatch.vendor_id = vendorId;
@@ -512,7 +519,7 @@ const getBookingStats = async (req, res) => {
 // ✅ Get bookings by Venue ID
 const getVenueBookings = async (req, res) => {
     try {
-        const { vendorId } = resolveVendorFilter(req);
+        const { vendorId } = await resolveVendorFilter(req);
         const { id } = req.params;
 
         const venueQuery = { _id: id, is_deleted: false };

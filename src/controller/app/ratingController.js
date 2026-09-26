@@ -31,6 +31,12 @@ const createRating = async (req, res) => {
             return apiResponse.badRequest(res, messages.BOOKING_NOT_FOUND);
         }
 
+        /* ================= ONE RATING PER BOOKING ================= */
+        const alreadyRated = await Rating.findOne({ booking_id: booking._id, user_id: userId }).select("_id").lean();
+        if (alreadyRated) {
+            return apiResponse.badRequest(res, "You have already rated this booking");
+        }
+
         /* ================= CREATE RATING ================= */
 
         const newRating = await Rating.create({

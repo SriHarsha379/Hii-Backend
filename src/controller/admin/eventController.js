@@ -2,6 +2,7 @@
 import { Event, Category, Vendor } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import { manageableVendorIds, ownershipFilter, isMainAdmin } from "../../utility/adminScope.js";
 
 
 // ---------------- CREATE EVENT ------------------
@@ -12,6 +13,13 @@ const createEvent = async (req, res) => {
     // this route (allowAdminOrVendor), an admin must specify which
     // club/organiser the event belongs to via `vendor_id` in the body.
     const vendorId = req.vendor ? req.vendor._id : req.body.vendor_id;
+    {
+      // Club / event admins may only create for their own club.
+      const allowed = await manageableVendorIds(req);
+      if (vendorId && allowed && !allowed.map(String).includes(String(vendorId))) {
+        return apiResponse.forbidden(res, messages.FORBIDDEN);
+      }
+    }
 
     if (!vendorId) {
       return apiResponse.badRequest(
@@ -267,9 +275,8 @@ const updateEvent = async (req, res) => {
     const { id } = req.params;
 
     // Vendors can only edit their own events; admins can edit any event.
-    const lookupFilter = req.vendor
-      ? { _id: id, vendor_id: req.vendor._id, is_deleted: false }
-      : { _id: id, is_deleted: false };
+    // Main admins: any; club / event admins and vendors: only their own.
+    const lookupFilter = { _id: id, is_deleted: false, ...(await ownershipFilter(req)) };
 
     const eventExists = await Event.findOne(lookupFilter);
 
@@ -627,9 +634,8 @@ const getEventById = async (req, res) => {
 const deleteEvent = async (req, res) => {
   try {
     // Vendors can only delete their own events; admins can delete any event.
-    const lookupFilter = req.vendor
-      ? { _id: req.params.id, vendor_id: req.vendor._id }
-      : { _id: req.params.id };
+    // Main admins: any; club / event admins and vendors: only their own.
+    const lookupFilter = { _id: req.params.id, ...(await ownershipFilter(req)) };
 
     const deletedEvent = await Event.findOneAndUpdate(
       lookupFilter,
@@ -654,6 +660,8 @@ const deleteEvent = async (req, res) => {
    duration, and an optional city scope. */
 const featureEvent = async (req, res) => {
   try {
+    // Featuring puts a club at the top of the app - main admins only.
+    if (!isMainAdmin(req)) return apiResponse.forbidden(res, messages.FORBIDDEN);
     const { id } = req.params;
     const { duration, city } = req.body;
 
@@ -675,6 +683,8 @@ const featureEvent = async (req, res) => {
 
 const unfeatureEvent = async (req, res) => {
   try {
+    // Featuring puts a club at the top of the app - main admins only.
+    if (!isMainAdmin(req)) return apiResponse.forbidden(res, messages.FORBIDDEN);
     const { id } = req.params;
     const event = await Event.findOneAndUpdate(
       { _id: id, is_deleted: false },

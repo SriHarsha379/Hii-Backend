@@ -1542,8 +1542,27 @@ let checkConverationId = async (req, res) => {
   }
 }
 
+
+// POST /user/update_player_id - the app reports this phone's current push
+// token on every launch and whenever Firebase rotates it.
+const updatePlayerId = async (req, res) => {
+  try {
+    const player_id = String(req.body?.player_id || "").trim();
+    // Real FCM tokens are long; ignore placeholders like "123456".
+    if (player_id.length < 20) return apiResponse.ok(res, {}, messages.SUCCESS);
+    // One phone = one account: take the token away from anyone else.
+    await User.updateMany({ player_id, _id: { $ne: req.userId } }, { $set: { player_id: null } });
+    const set = { player_id };
+    if (req.body?.device_type) set.device_type = String(req.body.device_type);
+    await User.updateOne({ _id: req.userId }, { $set: set });
+    return apiResponse.ok(res, {}, messages.SUCCESS);
+  } catch (error) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
+  }
+};
+
 export default {
-  admindetails, checkConverationId,
+  admindetails, updatePlayerId, checkConverationId,
   editProfile, updateProfileVisibility, getSwipeProfileSettings, updateMyVisibility, updateGalleryItemVisibility, deleteAccount, getFaqForCustomer, reportProblem, getSupportEmail, updateUserInterests, getMyProfile, uploadUserGallery, updateUserHobbies, updateUserVibeChecks, getRecentLikedItems,
   updateSocialAccount, addUserVibes, addUserEventPreferences, deleteUserGalleryItem, updateNotificationSetting, userChangePassword, enableTwoFA, getMyVisibility, getNotificationSettings
 };
