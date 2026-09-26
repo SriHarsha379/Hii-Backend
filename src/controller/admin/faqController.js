@@ -1,6 +1,7 @@
 import { Faq } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import escapeRegex from "../../utility/escapeRegex.js";
 
 
 // Create Faq
@@ -96,7 +97,7 @@ const updateFaq = async (req, res) => {
         // Check if question already exists (excluding current FAQ)
         if (question && question !== faq.question) {
             const existQuestion = await Faq.findOne({
-                question: { $regex: new RegExp(`^${question}$`, 'i') },
+                question: { $regex: new RegExp(`^${escapeRegex(question)}$`, 'i') },
                 is_deleted: false,
                 _id: { $ne: id }
             });

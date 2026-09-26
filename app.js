@@ -1,3 +1,4 @@
+import "./src/config/timezone.js"; // must be first - see file
 import express from "express";
 import dotenv from "dotenv";
 import http from "http";
@@ -14,6 +15,12 @@ import { startProfileCompletionReminderJob } from "./src/cron/profileCompletionR
 import { startInactiveMemberReminderJob } from "./src/cron/inactiveMemberReminderJob.js";
 
 dotenv.config();
+
+// Safety net: an error inside an async handler (e.g. a chat event) must
+// never stop the whole server - Node exits on unhandled rejections.
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
 
 const app = express();
 

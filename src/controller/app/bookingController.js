@@ -190,6 +190,13 @@ const createEventBooking = async (req, res) => {
       return apiResponse.badRequest(res, messages.NO_DATA_FOUND)
     }
 
+    // No tickets for an event that has already ended (dates are YYYY-MM-DD).
+    const todayIndia = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
+    if (event.end_date && String(event.end_date) < todayIndia) {
+      await session.abortTransaction()
+      return apiResponse.badRequest(res, "This event has already ended.")
+    }
+
     let totalQuantity = 0
     let vendorId = null
     const bookingTickets = []
@@ -430,14 +437,9 @@ const getVenueSlots = async (req, res) => {
 
       startDateTime.setMinutes(startDateTime.getMinutes() + 30)
 
-      if (
-        isToday &&
-        (
-          slotStart.getHours() < now.getHours() ||
-          (slotStart.getHours() === now.getHours() &&
-            slotStart.getMinutes() <= now.getMinutes())
-        )
-      ) continue
+      // Hide slots that have already started - full date & time, so tonight's
+      // after-midnight slots (e.g. 1 AM) aren't hidden as "earlier" than 9 PM.
+      if (slotStart.getTime() <= Date.now()) continue
 
       slots.push({
         start_time: slotStart,
@@ -564,6 +566,38 @@ const createVenueBooking = async (req, res) => {
 
     if (isNaN(slotDateTime.getTime())) {
       return apiResponse.badRequest(res, messages.INVALID_SLOTS);
+    }
+
+    /* ============ RIGHT NIGHT, NOT IN THE PAST, CLUB OPEN ============ */
+    // The slot list shows a night's slots under the date the night STARTS:
+    // "Fri + 1:00 am" means Saturday 1 AM (it used to be saved a day early).
+    const toMinutes = (t) => {
+      const mm = String(t || "").trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?$/);
+      if (!mm) return null;
+      let h = Number(mm[1]) % 24;
+      if (mm[3]) { const pm = mm[3].toLowerCase() === "pm"; if (h === 12) h = pm ? 12 : 0; else if (pm) h += 12; }
+      return h * 60 + Number(mm[2]);
+    };
+    const openMin = toMinutes(venue.start_time);
+    const closeMin = toMinutes(venue.end_time);
+    const slotMin = hours * 60 + minutes;
+    const overnight = openMin != null && closeMin != null && closeMin <= openMin;
+    if (overnight && slotMin < closeMin) {
+      slotDateTime.setTime(slotDateTime.getTime() + 24 * 60 * 60 * 1000);
+    }
+    if (slotDateTime.getTime() < Date.now() - 15 * 60 * 1000) {
+      return apiResponse.badRequest(res, "That time has already passed. Please pick another slot.");
+    }
+    const nightStartDay = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
+      new Date(`${date}T12:00:00+05:30`).getUTCDay()];
+    if (Array.isArray(venue.open_days) && venue.open_days.length && !venue.open_days.includes(nightStartDay)) {
+      return apiResponse.badRequest(res, `${venue.venue_name || "The venue"} is closed on ${nightStartDay}.`);
+    }
+    if (openMin != null && closeMin != null) {
+      const inHours = overnight ? (slotMin >= openMin || slotMin < closeMin) : (slotMin >= openMin && slotMin < closeMin);
+      if (!inHours) {
+        return apiResponse.badRequest(res, `${venue.venue_name || "The venue"} isn't open at that time. Please pick another slot.`);
+      }
     }
 
 

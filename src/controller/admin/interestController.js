@@ -1,6 +1,7 @@
 import { Interest } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import escapeRegex from "../../utility/escapeRegex.js";
 
 const createInterest = async (req, res) => {
     const { interest } = req.body;
@@ -8,7 +9,7 @@ const createInterest = async (req, res) => {
 
     try {
         const existInterest = await Interest.findOne({
-            interest: { $regex: new RegExp(`^${interest}$`, 'i') },
+            interest: { $regex: new RegExp(`^${escapeRegex(interest)}$`, 'i') },
             is_deleted: false
         });
 
@@ -84,7 +85,7 @@ const updateInterest = async (req, res) => {
 
         // ✅ Check duplicate (case-insensitive)
         const existInterest = await Interest.findOne({
-            interest: { $regex: `^${interest}$`, $options: "i" },
+            interest: { $regex: `^${escapeRegex(interest)}$`, $options: "i" },
             _id: { $ne: id },
             is_deleted: false
         });

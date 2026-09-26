@@ -1,9 +1,10 @@
-import { User, Venue, Booking, VenueLike, Event, EventLike, TrendingSearch, Friendship, UserBlock, Content } from "../../model/index.js";
+import { User, Venue, Booking, VenueLike, Event, EventLike, TrendingSearch, Friendship, UserBlock, Content, ReportProblem } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import helper from "../../utility/helper.js";
 import moment from "moment-timezone"
 import dotenv from "dotenv";
+import { notifyMainAdmins } from "../../utility/adminNotify.js";
 dotenv.config();
 
 /**
@@ -1800,4 +1801,30 @@ const getAllMembers = async (req, res) => {
   }
 };
 
-export default { getContent, getContentById, filterEventsVenues, getTrendingSearches, calenderFilter, getMyMembers, getMyVenues, getMyEvents, blockUnblockUser, getMyBlockedUsers, getProfileCompletionStatus, getEventVenueList, getAllMembers, deepLink, downloadApp };
+
+// POST /common/send_messageTo_admin - app Profile > Contact Us.
+// The app always called this, but it never existed, so every message was
+// lost. Filed as a support request (admin Support & Activity > Requests)
+// and the main admins are notified.
+const sendMessageToAdmin = async (req, res) => {
+  try {
+    const description = String(req.body?.description || "").trim();
+    if (!description) return apiResponse.badRequest(res, messages.MSG_EMPTY_PARAM);
+    const request = await ReportProblem.create({
+      user_id: req.userId,
+      description: `[Contact us] ${description}`.slice(0, 2000),
+      attachments: [],
+    });
+    notifyMainAdmins({
+      title: "New Contact Us message",
+      message: description.slice(0, 120),
+      action: "support_request",
+      action_json: { request_id: request._id },
+    });
+    return apiResponse.ok(res, {}, messages.CONTACT_RECEIVED);
+  } catch (error) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, error.message);
+  }
+};
+
+export default { sendMessageToAdmin, getContent, getContentById, filterEventsVenues, getTrendingSearches, calenderFilter, getMyMembers, getMyVenues, getMyEvents, blockUnblockUser, getMyBlockedUsers, getProfileCompletionStatus, getEventVenueList, getAllMembers, deepLink, downloadApp };

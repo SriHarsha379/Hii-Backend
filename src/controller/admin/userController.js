@@ -10,6 +10,7 @@ import path from "path";
 import mongoose from "mongoose";
 import moment from "moment";
 import generateToken from "../../utility/generateToken.js";
+import escapeRegex from "../../utility/escapeRegex.js";
 dotenv.config();
 
 
@@ -1528,7 +1529,7 @@ const getAllUsers = async (req, res) => {
     }
 
     if (search) {
-      const regex = new RegExp(search.trim(), "i");
+      const regex = new RegExp(escapeRegex(search.trim()), "i");
       filter.$or = [
         { name: regex },
         { first_name: regex },

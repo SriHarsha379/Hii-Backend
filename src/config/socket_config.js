@@ -324,47 +324,59 @@ function configureSocket(io) {
     });
     //=============================Get message Emit===========================
     socket.on("get_message_list", async (data) => {
-      if (!data.conversation_id) return;
-        let  result = await getMessage(data)
-        console.log('------------------message',result);
-            const user = userManager.getUserById(data.user_id);
-            if( user && user.socketId) io.to(user.socketId).emit("get_message_list", result);
+      // Security: only the logged-in member, and only for a conversation they
+      // are part of (it used to trust ids sent by the app, so anyone with a
+      // conversation id could load its messages).
+      try {
+        if (!data?.conversation_id) return;
+        const conv = await Conversation.findById(data.conversation_id).select("sender_id receiver_id").lean();
+        if (!conv || ![String(conv.sender_id), String(conv.receiver_id)].includes(String(userId))) return;
+        const result = await getMessage({ ...data, user_id: userId });
+        const user = userManager.getUserById(userId);
+        if (user && user.socketId) io.to(user.socketId).emit("get_message_list", result);
+      } catch (err) {
+        console.error("[socket get_message_list]", err.message);
+      }
     });
 
     //===========================Get message Emit end====================================
 
     //=============================Get get_conversation_list Emit===========================
     socket.on("get_conversation_list", async (data) => {
-
-      if (!data.user_id) return;
-        let  result = await getConversation(data)
-        console.log('----------------result',result);
-            const user = userManager.getUserById(data.user_id);
-            if( user && user.socketId) io.to(user.socketId).emit("get_conversation_list", result);
+      try {
+        const result = await getConversation({ ...(data || {}), user_id: userId }); // only the logged-in member
+        const user = userManager.getUserById(userId);
+        if (user && user.socketId) io.to(user.socketId).emit("get_conversation_list", result);
+      } catch (err) {
+        console.error("[socket get_conversation_list]", err.message);
+      }
     });
 
     //===========================Get get_conversation_list Emit end====================================
 
     //==============================Delete Message Emit ============================
     socket.on("message_deleted", async (data) => {
-      if (!data.user_id) return;
-            const user = userManager.getUserById(data.user_id);
-            // call function 
-            console.log('==================message_deleted',data);
-            let  result  = await   deleteMessage(data)
-            if(user.socketId) io.to(user.socketId).emit("delete_message", result);
+      try {
+        if (!data?.message_id) return;
+        const result = await deleteMessage({ ...data, user_id: userId }); // only the logged-in member
+        const user = userManager.getUserById(userId);
+        if (user && user.socketId) io.to(user.socketId).emit("delete_message", result); // was: crashed the server if not found
+      } catch (err) {
+        console.error("[socket message_deleted]", err.message);
+      }
     });
     //==============================Delete Message Emit End=======================
 
     
     //==============================recendFirendsList Message Emit ============================
     socket.on("recend_firends_list", async (data) => {
-      if (!data.user_id) return;
-            const user = userManager.getUserById(data.user_id);
-            // call function 
-            console.log('==================message_deleted',data);
-            let  result  = await   recendFirendsList(data)
-            if(user.socketId) io.to(user.socketId).emit("recend_firends_list", result);
+      try {
+        const result = await recendFirendsList({ ...(data || {}), user_id: userId }); // only the logged-in member
+        const user = userManager.getUserById(userId);
+        if (user && user.socketId) io.to(user.socketId).emit("recend_firends_list", result); // was: crashed the server if not found
+      } catch (err) {
+        console.error("[socket recend_firends_list]", err.message);
+      }
     });
     //==============================recendFirendsList Message Emit End=======================
 

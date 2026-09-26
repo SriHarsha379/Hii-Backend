@@ -276,6 +276,14 @@ const eventBookingSummary = async (req, res) => {
             return apiResponse.badRequest(res, messages.BOOKING_NOT_FOUND)
         }
 
+        // Only the member who booked (or a friend they invited) may see it -
+        // it contains their name, email, phone number and payment details.
+        const viewerId = String(req.userId);
+        const invitedIds = (booking.invited_friend_ids || []).map(String);
+        if (String(booking.user_id) !== viewerId && !invitedIds.includes(viewerId)) {
+            return apiResponse.badRequest(res, messages.BOOKING_NOT_FOUND);
+        }
+
         // Find event
         const event = await Event.findById(booking.event_id)
 

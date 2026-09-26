@@ -6,6 +6,7 @@ import { appAuth } from '../../middleware/authMiddleware.js';
 const route = express.Router();
 
 route
+    .post('/send_messageTo_admin', appAuth, manageController.sendMessageToAdmin)
     .get('/filter_events_venues', appAuth, manageController.filterEventsVenues)
     .get('/get_trending_keywords', appAuth, manageController.getTrendingSearches)
     .get("/calender_filter", appAuth, manageController.calenderFilter)

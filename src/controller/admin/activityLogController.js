@@ -1,6 +1,7 @@
 import { ActivityLog } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import escapeRegex from "../../utility/escapeRegex.js";
 
 // GET /activity-logs/get_all
 // Supports search (?search=), action filter (?action=CREATE|UPDATE|DELETE|LOGIN|LOGOUT),
@@ -12,7 +13,7 @@ const getAllLogs = async (req, res) => {
     const filter = {};
     if (action) filter.action = String(action).toUpperCase();
     if (search) {
-      const regex = new RegExp(search.trim(), "i");
+      const regex = new RegExp(escapeRegex(search.trim()), "i");
       filter.$or = [{ admin_name: regex }, { action: regex }, { resource: regex }, { details: regex }];
     }
 

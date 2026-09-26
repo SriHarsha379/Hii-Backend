@@ -35,39 +35,7 @@ route
   .get("/get_my_visibility", appAuth, userController.getMyVisibility)
   .get("/get_notification_setting", appAuth, userController.getNotificationSettings)
 
-route.get("/test-push/:token", async (req, res) => {
-  try {
-    const { token } = req.params;
-
-    console.log("Testing token:", token);
-
-    const message = {
-      notification: {
-        title: "Production Test",
-        body: "Push notification is working 🚀",
-      },
-      token: token,
-    };
-
-    const response = await admin.messaging().send(message);
-
-    console.log("FCM SUCCESS:", response);
-
-    return res.json({
-      success: true,
-      response,
-    });
-
-  } catch (error) {
-    console.log("FCM ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      fullError: error,
-    });
-  }
-});
+// (removed: open /test-push endpoint - anyone could send pushes)
 
 route.get('/admin_details',appAuth ,userController.admindetails)
 

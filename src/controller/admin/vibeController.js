@@ -2,6 +2,7 @@ import moment from "moment";
 import { Vibe } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import escapeRegex from "../../utility/escapeRegex.js";
 
 
 const addVibe = async (req, res) => {
@@ -20,7 +21,7 @@ const addVibe = async (req, res) => {
 
         // ✅ Check duplicate (case-insensitive)
         const existVibe = await Vibe.findOne({
-            vibe: { $regex: `^${vibe}$`, $options: "i" },
+            vibe: { $regex: `^${escapeRegex(vibe)}$`, $options: "i" },
             is_deleted: false
         });
         if (existVibe) return apiResponse.badRequest(res, messages.VIBE_ALREADY_EXISTS);
@@ -106,7 +107,7 @@ const editVibe = async (req, res) => {
 
         // ✅ Check duplicate (case-insensitive + excluding current ID)
         const existVibe = await Vibe.findOne({
-            vibe: { $regex: `^${vibe}$`, $options: "i" },
+            vibe: { $regex: `^${escapeRegex(vibe)}$`, $options: "i" },
             _id: { $ne: id },
             is_deleted: false
         });

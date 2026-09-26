@@ -58,7 +58,7 @@ const getVenueDetail = async (req, res) => {
             venue.longitude
         );
 
-        const today = new Date().toISOString().split("T")[0];
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: process.env.TZ || "Asia/Kolkata" }); // India date, not UTC
 
         /* ===== UPCOMING EVENTS AT VENUE ===== */
         const upcomingEvents = await Event.find({
@@ -321,6 +321,14 @@ const venueBookingSummary = async (req, res) => {
         const booking = await Booking.findById(booking_id);
         if (!booking) {
             return apiResponse.badRequest(res, messages.BOOKING_NOT_FOUND)
+        }
+
+        // Only the member who booked (or a friend they invited) may see it -
+        // it contains their name, email, phone number and payment details.
+        const viewerId = String(req.userId);
+        const invitedIds = (booking.invited_friend_ids || []).map(String);
+        if (String(booking.user_id) !== viewerId && !invitedIds.includes(viewerId)) {
+            return apiResponse.badRequest(res, messages.BOOKING_NOT_FOUND);
         }
 
         // Find venue

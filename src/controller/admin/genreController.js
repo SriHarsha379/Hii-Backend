@@ -2,6 +2,7 @@ import moment from "moment";
 import { Genre } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
+import escapeRegex from "../../utility/escapeRegex.js";
 
 const addGenre = async (req, res) => {
   try {
@@ -55,9 +56,9 @@ const getAllGenres = async (req, res) => {
 
     if (search) {
       filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { category: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
+        { name: { $regex: escapeRegex(search), $options: "i" } },
+        { category: { $regex: escapeRegex(search), $options: "i" } },
+        { description: { $regex: escapeRegex(search), $options: "i" } },
       ];
     }
 
@@ -115,7 +116,7 @@ const updateGenre = async (req, res) => {
 
     if (name) {
       const existGenre = await Genre.findOne({
-        name: { $regex: new RegExp(`^${name}$`, "i") },
+        name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
         _id: { $ne: id },
         is_deleted: false,
       });
