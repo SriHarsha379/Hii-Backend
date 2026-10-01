@@ -5,8 +5,19 @@ const ReportProblemSchema = new mongoose.Schema(
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true
+      default: null // members only (clubs / organisers use admin_id)
     },
+
+    // who sent it: app member, club admin or event organiser (dashboard)
+    source: {
+      type: String,
+      enum: ["member", "club", "organiser"],
+      default: "member",
+      index: true
+    },
+    category: { type: String, default: "Other", index: true },
+    admin_id: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    vendor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor", default: null },
 
     description: {
       type: String,

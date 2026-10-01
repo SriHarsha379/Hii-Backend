@@ -5,6 +5,7 @@ import helper from "../../utility/helper.js";
 import moment from "moment-timezone"
 import dotenv from "dotenv";
 import { notifyMainAdmins } from "../../utility/adminNotify.js";
+import { normalizeSupportCategory, SUPPORT_CATEGORIES } from "../../utility/supportCategories.js";
 dotenv.config();
 
 /**
@@ -1812,6 +1813,8 @@ const sendMessageToAdmin = async (req, res) => {
     if (!description) return apiResponse.badRequest(res, messages.MSG_EMPTY_PARAM);
     const request = await ReportProblem.create({
       user_id: req.userId,
+      source: "member",
+      category: normalizeSupportCategory("member", req.body?.category),
       description: `[Contact us] ${description}`.slice(0, 2000),
       attachments: [],
     });
@@ -1827,4 +1830,8 @@ const sendMessageToAdmin = async (req, res) => {
   }
 };
 
-export default { sendMessageToAdmin, getContent, getContentById, filterEventsVenues, getTrendingSearches, calenderFilter, getMyMembers, getMyVenues, getMyEvents, blockUnblockUser, getMyBlockedUsers, getProfileCompletionStatus, getEventVenueList, getAllMembers, deepLink, downloadApp };
+// GET /common/support_categories - categories members can pick
+const getSupportCategories = async (req, res) =>
+  apiResponse.ok(res, SUPPORT_CATEGORIES.member, messages.DATA_FOUND);
+
+export default { getSupportCategories, sendMessageToAdmin, getContent, getContentById, filterEventsVenues, getTrendingSearches, calenderFilter, getMyMembers, getMyVenues, getMyEvents, blockUnblockUser, getMyBlockedUsers, getProfileCompletionStatus, getEventVenueList, getAllMembers, deepLink, downloadApp };

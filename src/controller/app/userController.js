@@ -10,6 +10,7 @@ import mongoose from "mongoose";
 import moment from "moment";
 import generateToken from "../../utility/generateToken.js";
 import { notifyMainAdmins } from "../../utility/adminNotify.js";
+import { normalizeSupportCategory, SUPPORT_CATEGORIES } from "../../utility/supportCategories.js";
 dotenv.config();
 
 
@@ -461,6 +462,8 @@ const reportProblem = async (req, res) => {
     }
 
     const report = await ReportProblem.create({
+      source: "member",
+      category: normalizeSupportCategory("member", req.body?.category),
       user_id: userId,
       description,
       attachments

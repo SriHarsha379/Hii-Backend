@@ -87,6 +87,11 @@ const sendNotification = async (type, playerId, extraData = {}, badge = 0) => {
       icon = '📢';
       break;
 
+    case 'support_reply':
+      title = 'Hii Support';
+      message = extraData?.message || 'There is an update on your request.';
+      break;
+
     case 'new_blog':
       title = 'New on the Hii blog ✍️';
       message = extraData?.blog_title || 'A new blog post is up - take a look.';
