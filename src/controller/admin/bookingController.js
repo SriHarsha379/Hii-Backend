@@ -5,6 +5,7 @@ import messages from "../../utility/messages.js";
 // import { getCommissionPercent } from "../../utility/commissionUtility.js";
 import ticketController from "./ticketController.js";
 import { manageableVendorIds, ownershipFilter, isMainAdmin } from "../../utility/adminScope.js";
+import sendNotification from "../../utility/notification.js";
 
 // Helper to determine vendor filter (vendor user vs admin).
 // FIXED: previously "isAdmin" meant "see every booking platform-wide" —
@@ -178,7 +179,7 @@ const getBookingById = async (req, res) => {
             transaction_id: booking.transaction_id || '',
             booking_type: booking.booking_type || '',
             is_active: booking.is_active,
-            status: booking.status || 'confirmed',
+            status: booking.booking_status || 'confirmed',
             payment_status: booking.payment_status || 'paid',
             payment_method: booking.payment_method || '',
             num_tickets: booking.num_tickets || 1,
@@ -309,7 +310,7 @@ const getEventBookings = async (req, res) => {
             total: booking.total,
             num_tickets: booking.num_tickets || 1,
             transaction_id: booking.transaction_id,
-            status: booking.status || 'confirmed',
+            status: booking.booking_status || 'confirmed',
             payment_status: booking.payment_status || 'paid',
             booking_reference: booking.booking_reference,
             createdAt: booking.createdAt,
@@ -324,6 +325,23 @@ const getEventBookings = async (req, res) => {
 };
 
 // ✅ Update booking status (for cancellations, refunds, etc.)
+// Tell the member their booking was cancelled (they used to find out at the door).
+const notifyBookingCancelled = async (booking) => {
+    try {
+        const member = await User.findById(booking.user_id).select("player_id").lean();
+        if (!member) return;
+        await sendNotification("booking_cancelled", member.player_id, {
+            senderId: booking.vendor_id,
+            other_user_id: member._id,
+            action: "booking_cancelled",
+            booking_id: booking._id,
+            place: booking.venue_id?.venue_name || booking.event_id?.venue_name || "",
+        }, 0);
+    } catch (err) {
+        console.warn("[booking] cancel notification:", err.message);
+    }
+};
+
 const updateBookingStatus = async (req, res) => {
     try {
         // FIXED: was hardcoded to `req.vendor._id`, which crashes for any
@@ -337,7 +355,8 @@ const updateBookingStatus = async (req, res) => {
         const bookingFilter = { _id: id, is_deleted: false };
         if (vendorId) bookingFilter.vendor_id = vendorId;
 
-        const booking = await Booking.findOne(bookingFilter).populate('ticket_id');
+        const booking = await Booking.findOne(bookingFilter).populate('ticket_id')
+            .populate('venue_id', 'venue_name').populate('event_id', 'venue_name');
 
         if (!booking) {
             return apiResponse.notFoundResponse(res, messages.BOOKING_NOT_FOUND[0]);
@@ -362,31 +381,22 @@ const updateBookingStatus = async (req, res) => {
 
             await booking.save({ session });
 
-            // If booking is cancelled and was previously confirmed, release tickets
-            if (status === 'cancelled' && oldStatus === 'confirmed') {
-                if (booking.ticket_id) {
-                    await ticketController.updateTicketSoldCount(
-                        booking.ticket_id._id, 
-                        booking.num_tickets || 1, 
-                        'subtract'
-                    );
-                }
+            // Release / re-take tickets. App bookings keep them in event_tickets
+            // (the old single ticket_id is empty), so cancelling released none.
+            const ticketLines = (booking.event_tickets && booking.event_tickets.length)
+                ? booking.event_tickets.map((t) => ({ id: t.ticket_id, qty: t.quantity || 1 }))
+                : (booking.ticket_id ? [{ id: booking.ticket_id._id, qty: booking.num_tickets || 1 }] : []);
+            if (status === 'cancelled' && oldStatus !== 'cancelled') {
+                for (const t of ticketLines) await ticketController.updateTicketSoldCount(t.id, t.qty, 'subtract');
             }
-
-            // If booking is confirmed and was previously cancelled, re-allocate tickets
             if (status === 'confirmed' && oldStatus === 'cancelled') {
-                if (booking.ticket_id) {
-                    await ticketController.updateTicketSoldCount(
-                        booking.ticket_id._id, 
-                        booking.num_tickets || 1, 
-                        'add'
-                    );
-                }
+                for (const t of ticketLines) await ticketController.updateTicketSoldCount(t.id, t.qty, 'add');
             }
 
             await session.commitTransaction();
             session.endSession();
 
+            if (status === 'cancelled' && oldStatus !== 'cancelled') notifyBookingCancelled(booking);
             return apiResponse.ok(res, booking, "Booking status updated successfully");
         } catch (error) {
             await session.abortTransaction();
@@ -557,7 +567,7 @@ const getVenueBookings = async (req, res) => {
             total: booking.total,
             num_tickets: booking.num_tickets || 1,
             transaction_id: booking.transaction_id,
-            status: booking.status || 'confirmed',
+            status: booking.booking_status || 'confirmed',
             createdAt: booking.createdAt,
             updatedAt: booking.updatedAt
         }));

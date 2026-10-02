@@ -3,12 +3,14 @@
 import bcrypt from "bcryptjs";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
-import { Vendor, Event, Venue, Booking, WithdrawRequest } from "../../model/index.js";
+import { Vendor, Event, Venue, Booking, WithdrawRequest, Admin } from "../../model/index.js";
 import { updateVendorSchema } from "../../validation/admin/vendorValidation.js";
 import sendmail from "../../utility/sendmail.js"; // Add this import
 import logActivity from "../../utility/activityLogger.js";
 import vendorOtpController from "./vendorOtpController.js";
 import { notifyMainAdmins } from "../../utility/adminNotify.js";
+import { isMainAdmin, manageableVendorIds, isVendorClaimed, exactNameRx } from "../../utility/adminScope.js";
+import { notifyMainAdmins as notifyMainAdminsForClaim } from "../../utility/adminNotify.js";
 
 
 /* GET ALL VENDORS
@@ -259,6 +261,11 @@ const createVendor = async (req, res) => {
     // Create vendor
     const vendor = await Vendor.create(vendorData);
 
+    // Save the club link on the server (it used to live only in the browser).
+    if (req.user && ["CLUB_ADMIN", "EVENT_ADMIN"].includes(req.user.role)) {
+      await Admin.updateOne({ _id: req.user._id }, { $set: { organisation: vendor.name } });
+    }
+
     // Club / organiser self-signup -> main admins (Organiser Requests page).
     if (req.user && req.user.role !== 'SUPER_ADMIN') {
       notifyMainAdmins({
@@ -391,6 +398,18 @@ const updateVendor = async (req, res) => {
     if (!vendor) {
       console.log('❌ Vendor not found for update:', id);
       return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
+    }
+
+    // Club / event admins may edit only THEIR club, or claim an unclaimed one
+    // (any club admin could edit any club before - details, email, password).
+    const previousVendorName = vendor.name; // for keeping admins linked on rename
+    let claiming = false;
+    if (!isMainAdmin(req)) {
+      const mine = (await manageableVendorIds(req)) || [];
+      if (!mine.some((v) => String(v) === String(vendor._id))) {
+        if (await isVendorClaimed(vendor)) return apiResponse.forbidden(res, messages.FORBIDDEN);
+        claiming = true;
+      }
     }
 
     const updates = {};
@@ -579,6 +598,18 @@ const updateVendor = async (req, res) => {
       } catch (emailError) {
         console.error('❌ Failed to send update email:', emailError.message);
       }
+    }
+
+    // Keep club admins linked (they're linked by organisation name).
+    try {
+      if (updatedVendor && previousVendorName && updatedVendor.name !== previousVendorName) {
+        await Admin.updateMany({ organisation: exactNameRx(previousVendorName) }, { $set: { organisation: updatedVendor.name } });
+      }
+      if (claiming && updatedVendor) {
+        await Admin.updateOne({ _id: req.user._id }, { $set: { organisation: updatedVendor.name } });
+      }
+    } catch (linkErr) {
+      console.warn("[club link]", linkErr.message);
     }
 
     return apiResponse.ok(res, updatedVendor, messages.VENDOR_UPDATED);
@@ -1288,7 +1319,39 @@ const deleteBankDetails = async (req, res) => {
   }
 };
 
+
+// POST /vendor/claim/:id - a club / event admin claims an existing club.
+// Saves the link on the server (claiming used to be saved only in the
+// browser). Only clubs nobody has claimed yet; main admins are notified.
+const claimVendor = async (req, res) => {
+  try {
+    if (!req.user || !["CLUB_ADMIN", "EVENT_ADMIN"].includes(req.user.role)) {
+      return apiResponse.forbidden(res, messages.FORBIDDEN);
+    }
+    const vendor = await Vendor.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
+    if (!vendor) return apiResponse.notFoundResponse(res, messages.VENDOR_NOT_FOUND);
+    const mine = (await manageableVendorIds(req)) || [];
+    const alreadyMine = mine.some((v) => String(v) === String(vendor._id));
+    if (!alreadyMine && await isVendorClaimed(vendor)) {
+      return apiResponse.badRequest(res, "This club has already been claimed. Please contact Hii support.");
+    }
+    await Admin.updateOne({ _id: req.user._id }, { $set: { organisation: vendor.name } });
+    if (!alreadyMine) {
+      notifyMainAdminsForClaim({
+        title: "Club claimed",
+        message: `${req.user.name || req.user.email} claimed "${vendor.name}" - please check it's really them.`,
+        action: "organiser_request",
+        action_json: { vendor_id: vendor._id },
+      });
+    }
+    return apiResponse.ok(res, { organisation: vendor.name }, "Club claimed");
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
 export default {
+  claimVendor,
   getAllVendors,
   getVendorById,
   approveVendor,

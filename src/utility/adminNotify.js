@@ -1,4 +1,5 @@
 import { Admin, Vendor, Notification } from "../model/index.js";
+import { vendorIdsForAdmin } from "./adminScope.js";
 
 /* =====================================================================
    ADMIN DASHBOARD NOTIFICATIONS
@@ -57,10 +58,9 @@ export const dashboardNotificationFilter = async (req) => {
   const admin = req.user;
   if (!admin?._id) return null;
   const or = [{ user_id: admin._id }];
-  if (["CLUB_ADMIN", "EVENT_ADMIN"].includes(admin.role) && admin.organisation) {
-    const vendors = await Vendor.find({ name: admin.organisation, is_deleted: { $ne: true } })
-      .select("_id").lean();
-    if (vendors.length) or.push({ vendor_user_id: { $in: vendors.map((v) => v._id) } });
+  if (["CLUB_ADMIN", "EVENT_ADMIN"].includes(admin.role)) {
+    const vendorIds = await vendorIdsForAdmin(admin);
+    if (vendorIds.length) or.push({ vendor_user_id: { $in: vendorIds } });
   }
   return { $or: or };
 };

@@ -19,6 +19,7 @@ route
   .post("/add_vendor", adminauth, upload.single("business_image"), vendorController.createVendor)
 
   .put("/update_vendor/:id", adminauth, upload.single("business_image"), vendorController.updateVendor)
+  .post("/claim/:id", adminauth, vendorController.claimVendor)
 
   // Existing toggle endpoint with email
   .post("/change_Status/:id", adminauth, vendorController.updateVendorStatus)

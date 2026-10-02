@@ -58,8 +58,12 @@ const sendNotification = async (type, playerId, extraData = {}, badge = 0) => {
       break;
 
     case 'booking_cancelled':
-      message = `#${extraData.booking_code} Booking cancelled by the customer.`
+      title = 'Booking cancelled';
+      message = extraData?.place
+        ? `Your booking at ${extraData.place} has been cancelled by the club.`
+        : 'Your booking has been cancelled by the club.';
       break;
+
 
 
     case 'booking_accepted':
