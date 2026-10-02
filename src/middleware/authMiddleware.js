@@ -42,11 +42,11 @@ const appAuth = async (req, res, next) => {
       // Attach admin to request (excluding password)
       req.userId = decoded.id
       if (!decoded.id) {
-        return apiResponse.forbidden(res, messages.FORBIDDEN);
+        return apiResponse.unauthorized(res, messages.TOKEN_INVALID);
       }
       const user = await User.findOne({ _id: decoded.id, is_deleted: false });
       req.user_type
-      if (!user) return apiResponse.notFoundResponse(res, messages.NOT_FOUND);
+      if (!user) return apiResponse.unauthorized(res, ["This account no longer exists. Please log in again."]); // account no longer exists -> log out
       if (!user.is_active) return apiResponse.accountDeactiveResponse(res, messages.ACCOUNT_DEACTIVATE_BY_ADMIN);
 
       // Activity tracking for the inactive-member reminder cron — was
