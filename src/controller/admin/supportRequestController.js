@@ -1,4 +1,4 @@
-import { ReportProblem, User } from "../../model/index.js";
+import { ReportProblem, User, Notification } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import sendNotification from "../../utility/notification.js";
@@ -34,7 +34,8 @@ const getAllRequests = async (req, res) => {
     if (status) filter.status = status;
     if (source === "member") filter.source = { $in: ["member", null] }; // older rows have no source
     else if (SOURCES.includes(source)) filter.source = source;
-    if (category) filter.category = category;
+    if (category === "Other") filter.category = { $in: ["Other", null] }; // older rows have no category
+    else if (category) filter.category = category;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.max(1, Math.min(500, parseInt(limit, 10) || 100));
@@ -103,6 +104,10 @@ const updateRequestStatus = async (req, res) => {
         action: "support_reply",
         action_json: { request_id: request._id },
       });
+    } else if (request.admin_id) {
+      // Not linked to a club (organisation name doesn't match a club's name):
+      // notify the admin account that sent it.
+      notifyAdminDirectly(request.admin_id, text, request._id);
     }
 
     const out = request.toObject();
@@ -111,6 +116,24 @@ const updateRequestStatus = async (req, res) => {
   } catch (err) {
     console.error(err);
     return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
+// Dashboard bell notification for one admin account (never throws).
+const notifyAdminDirectly = async (adminId, text, requestId) => {
+  try {
+    await Notification.create({
+      user_id: adminId,
+      other_user_id: null,
+      title: "Reply from Hii support",
+      message: String(text).slice(0, 160),
+      action: "support_reply",
+      action_json: { request_id: requestId },
+      read_status: 0,
+      is_deleted: 0,
+    });
+  } catch (err) {
+    console.warn("[support] admin notification:", err.message);
   }
 };
 
