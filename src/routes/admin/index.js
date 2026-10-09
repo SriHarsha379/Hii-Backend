@@ -97,6 +97,7 @@ const routeArray = [
   { path: "/polls", route: pollRoute },
   { path: "/contests", route: contestRoute },
   { path: "/search", route: searchRoute },
+  { path: "/user-roles", route: userRolesRoute },
 ];
 
 routeArray.forEach(({ path, route }) => router.use(path, route));

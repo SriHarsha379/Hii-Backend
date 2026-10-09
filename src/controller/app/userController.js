@@ -562,7 +562,6 @@ const getMyProfile = async (req, res) => {
       _id: userId,
       is_deleted: false
     })
-      .populate("vibes", "_id vibe image")
       .populate("music_genre", "_id name image")
       .populate("event_preferences", "_id category_name image")
       .lean();
