@@ -32,8 +32,8 @@ const createCity = async (req, res) => {
             city_name: city_name.trim(),
             state_id,
             city_image,
-            latitude: Number(latitude),
-            longitude: Number(longitude)
+            latitude: latitude != null ? Number(latitude) : undefined,
+            longitude: longitude != null ? Number(longitude) : undefined
         });
 
         await city.save();

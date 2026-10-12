@@ -9,9 +9,9 @@ const city_schema = Joi.object({
       "any.required": "City name cannot be empty"
     }),
 
-  state_id: Joi.string().required(),
-  latitude: Joi.number().required(),
-  longitude: Joi.number().required()
+  state_id: Joi.string().optional().allow("", null),
+  latitude: Joi.number().optional().allow("", null),
+  longitude: Joi.number().optional().allow("", null)
 });
 
 export { city_schema };

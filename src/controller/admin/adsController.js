@@ -6,7 +6,7 @@ import logActivity from "../../utility/activityLogger.js";
 /* ================= CREATE AD ================= */
 const createAd = async (req, res) => {
     try {
-        const { expiry_date, link_url, video_width, video_height } = req.body;
+        const { expiry_date, link_url, video_width, video_height, ad_name } = req.body;
         const ad_image = req.files?.ad_image?.[0]?.filename;
         const ad_video = req.files?.ad_video?.[0]?.filename;
 
@@ -35,7 +35,8 @@ const createAd = async (req, res) => {
             video_width: ad_video ? Number(video_width) : null,
             video_height: ad_video ? Number(video_height) : null,
             link_url: link_url || null,
-            expiry_date: expiry_date || null
+            expiry_date: expiry_date || null,
+            ad_name: ad_name || null
         });
 
         await ad.save();
@@ -67,7 +68,7 @@ const getAds = async (req, res) => {
 const updateAd = async (req, res) => {
     try {
         const { id } = req.params;
-        const { expiry_date, link_url, video_width, video_height } = req.body;
+        const { expiry_date, link_url, video_width, video_height, ad_name } = req.body;
 
         const ad_image = req.files?.ad_image?.[0]?.filename;
         const ad_video = req.files?.ad_video?.[0]?.filename;
@@ -113,6 +114,10 @@ const updateAd = async (req, res) => {
 
         if (link_url !== undefined) {
             ad.link_url = link_url || null;
+        }
+
+        if (ad_name !== undefined) {
+            ad.ad_name = ad_name || null;
         }
 
         await ad.save();

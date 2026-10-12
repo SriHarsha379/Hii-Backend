@@ -7,6 +7,11 @@ const AdSchema = new mongoose.Schema(
         // ad_title: {
         //     type: String,
         // },
+        ad_name: {
+            type: String,
+            trim: true,
+            default: null,
+        },
         ad_image: {
             type: String,
             required: true,
