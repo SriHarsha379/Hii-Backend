@@ -32,6 +32,10 @@ const AdSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        start_date: {
+            type: Date,
+            default: null,
+        },
         expiry_date: {
             type: Date, // ✅ new field
         },
