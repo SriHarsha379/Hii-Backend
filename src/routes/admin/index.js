@@ -39,6 +39,7 @@ import adminManagementRoute from "./adminManagementRoute.js"
 import pollRoute from "./pollRoute.js"
 import contestRoute from "./contestRoute.js"
 import searchRoute from "./searchRoute.js"
+import userRolesRoute from "./userRolesRoute.js";
 
 
 const router = express.Router();

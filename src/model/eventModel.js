@@ -28,7 +28,7 @@ const EventSchema = new mongoose.Schema(
     start_date: { type: String, required: true },
     end_date: { type: String, required: true },
     is_multi_day: { type: Boolean, default: false },
-    about: { type: String, required: true },
+    about: { type: String, default: "" },
 
     gallery_images: [{ type: String, required: true }],
 

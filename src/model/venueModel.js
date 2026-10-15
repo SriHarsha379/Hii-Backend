@@ -30,7 +30,7 @@ const VenueSchema = new mongoose.Schema(
     latitude: { type: Number },
     longitude: { type: Number },
 
-    about: { type: String, required: true },
+    about: { type: String, default: "" },
     gallery_images: [{ type: String }],
 
     // Remove open_hours (commented out)
