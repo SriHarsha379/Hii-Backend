@@ -196,6 +196,7 @@ const updateVenue = async (req, res) => {
       open_days,
       venue_image: venue_image_from_body,
       gallery_images: gallery_images_from_body,
+      existing_gallery_images,
       terms_and_conditions
     } = req.body;
 
@@ -318,8 +319,15 @@ const updateVenue = async (req, res) => {
       updateData.venue_image = venue_image_from_body;
     }
 
-    if (req.files?.gallery_images?.length > 0) {
-      updateData.gallery_images = req.files.gallery_images.map(f => f.filename);
+    if (existing_gallery_images !== undefined || req.files?.gallery_images?.length > 0) {
+      let existingGallery = [];
+      try {
+        existingGallery = existing_gallery_images
+          ? (typeof existing_gallery_images === "string" ? JSON.parse(existing_gallery_images) : existing_gallery_images)
+          : [];
+      } catch { existingGallery = []; }
+      const newGallery = req.files?.gallery_images?.map(f => f.filename) || [];
+      updateData.gallery_images = [...existingGallery, ...newGallery];
     } else if (gallery_images_from_body) {
       updateData.gallery_images = gallery_images_from_body;
     }
