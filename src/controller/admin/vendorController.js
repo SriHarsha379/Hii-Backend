@@ -311,23 +311,13 @@ const createVendor = async (req, res) => {
       if (mailResponse !== "yes") {
         console.error("❌ Email failed");
 
-        return apiResponse.serverError(
           res,
-          "Vendor created but email not sent"
-        );
       }
 
       console.log("✅ Email sent successfully");
 
     } catch (emailError) {
-
-      console.error("❌ Email exception:", emailError);
-
-      return apiResponse.serverError(
-        res,
-        "Vendor created but email crashed",
-        emailError.message
-      );
+      console.error("❌ Email exception (non-fatal):", emailError.message);
     }
 
     // Return vendor without password
