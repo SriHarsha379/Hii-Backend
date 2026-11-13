@@ -887,7 +887,7 @@ const activateVendor = async (req, res) => {
         console.error('❌ Activation email failed:', emailResult.error);
       }
     } catch (emailError) {
-      console.error('❌ Activation email failed with error:', emailResult?.error || emailError.message);
+      console.error('❌ Activation email failed:', emailError.message);
     }
 
     return apiResponse.ok(
@@ -968,7 +968,7 @@ const deactivateVendor = async (req, res) => {
         console.error('❌ Deactivation email failed:', emailResult.error);
       }
     } catch (emailError) {
-      console.error('❌ Deactivation email failed with error:', emailResult?.error || emailError.message);
+      console.error('❌ Deactivation email failed:', emailError.message);
     }
 
     return apiResponse.ok(

@@ -298,7 +298,7 @@ const updateAdminProfile = async (req, res) => {
 
     // ✅ Email Validation (strict format only)
     if (email && email !== data.email) {
-      const emailRegex = /^[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]{2,}$/;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         return apiResponse.badRequest(res, messages.INVALID_EMAIL[0]);
       }
