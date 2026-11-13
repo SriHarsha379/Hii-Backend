@@ -152,7 +152,7 @@ const createEvent = async (req, res) => {
       if (prohibited_items) {
         parsedProhibitedItems = JSON.parse(prohibited_items);
         if (!Array.isArray(parsedProhibitedItems)) {
-          parsedProhibitedItems = [parsedProhibited_items];
+          parsedProhibitedItems = [parsedProhibitedItems];
         }
 
         parsedProhibitedItems = parsedProhibitedItems.map((item) => ({

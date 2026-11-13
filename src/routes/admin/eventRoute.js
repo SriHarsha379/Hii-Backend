@@ -29,7 +29,7 @@ route.put(
   allowAdminOrVendor,
   upload.fields([
     { name: "venue_image", maxCount: 1 },
-    { name: "artist_image", maxCount: 1 },  // Added artist image
+    { name: "artist_images", maxCount: 20 },
     { name: "gallery_images", maxCount: 10 },
     { name: "event_layout_images", maxCount: 1 }
   ]),
