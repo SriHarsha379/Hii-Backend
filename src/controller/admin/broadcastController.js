@@ -71,7 +71,7 @@ const sendBroadcastMessageAllUser = async (req, res) => {
             );
         }
 
-        return apiResponse.ok(res, messages.BROADCAST_SENT_SUCESSFULLY);
+        return apiResponse.ok(res, {}, messages.BROADCAST_SENT_SUCESSFULLY);
 
     } catch (error) {
         console.error("Broadcast error:", error);

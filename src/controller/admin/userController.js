@@ -676,10 +676,6 @@ const getMyProfile = async (req, res) => {
       snapchat: user.snapchat_account || "",
       liked_events: recently_liked_events,
       followed_venues: recently_liked_venues,
-      top_artist: {
-        name: "The Weeknd",
-        image: "default-artist.jpg"
-      },
       total_likes: total_likes,
       total_friends: total_friends
     };

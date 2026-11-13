@@ -412,13 +412,12 @@ const updateBookingStatus = async (req, res) => {
 // ✅ Delete booking (soft delete with ticket release)
 const deleteBooking = async (req, res) => {
     try {
-        const vendor_id = req.vendor._id;
+        const { vendorId } = await resolveVendorFilter(req);
         const { id } = req.params;
 
-        const booking = await Booking.findOne({
-            _id: id,
-            vendor_id
-        }).populate('ticket_id');
+        const bookingFilter = { _id: id };
+        if (vendorId) bookingFilter.vendor_id = vendorId;
+        const booking = await Booking.findOne(bookingFilter).populate('ticket_id');
 
         if (!booking) {
             return apiResponse.notFoundResponse(res, messages.BOOKING_NOT_FOUND[0]);
@@ -472,7 +471,7 @@ const getBookingStats = async (req, res) => {
             { 
                 $match: { 
                     ...baseMatch,
-                    status: 'confirmed'
+                    booking_status: 'confirmed'
                 } 
             },
             { 
@@ -495,17 +494,17 @@ const getBookingStats = async (req, res) => {
         // Get status counts
         const confirmedBookings = await Booking.countDocuments({
             ...baseMatch,
-            status: 'confirmed'
+            booking_status: 'confirmed'
         });
 
         const pendingBookings = await Booking.countDocuments({
             ...baseMatch,
-            status: 'pending'
+            booking_status: 'pending'
         });
 
         const cancelledBookings = await Booking.countDocuments({
             ...baseMatch,
-            status: 'cancelled'
+            booking_status: 'cancelled'
         });
 
         const stats = {

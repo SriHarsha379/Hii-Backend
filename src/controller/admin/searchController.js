@@ -12,7 +12,7 @@ const ADMIN_ROLE_LABEL = {
 const search = async (req, res) => {
   try {
     const q = (req.query.q || "").toString().trim();
-    if (!q) return res.json([]);
+    if (!q) return apiResponse.ok(res, [], 'No query');
     const regex = new RegExp(escapeRegex(q), "i");
 
     const [vendors, events, users, admins] = await Promise.all([
@@ -42,7 +42,7 @@ const search = async (req, res) => {
       }),
       ...admins.map((a) => ({ type: "admin", id: a._id, title: a.name || a.organisation || a.email || "Admin", role: ADMIN_ROLE_LABEL[a.role] || "Admin", link: "/admins" })),
     ];
-    return res.json(results);
+    return apiResponse.ok(res, results, 'Search results');
   } catch (err) {
     return apiResponse.serverError(res, "Search failed", err.message);
   }
