@@ -310,8 +310,6 @@ const createVendor = async (req, res) => {
 
       if (mailResponse !== "yes") {
         console.error("❌ Email failed");
-
-          res,
       }
 
       console.log("✅ Email sent successfully");
@@ -1378,8 +1376,12 @@ const getMyStatus = async (req, res) => {
     if (!admin.organisation) {
       return apiResponse.ok(res, null, "No organisation linked");
     }
+    // Try vendorId first (set after Issue 51 fix), fall back to name
+    const query = admin.vendorId
+      ? { _id: admin.vendorId, is_deleted: { $ne: true } }
+      : { name: admin.organisation, is_deleted: { $ne: true } };
     const vendor = await Vendor.findOne(
-      { name: admin.organisation, is_deleted: { $ne: true } },
+      query,
       { _id: 1, is_verified: 1, is_active: 1, name: 1 }
     ).lean();
     return apiResponse.ok(res, vendor || null, "Status fetched");
