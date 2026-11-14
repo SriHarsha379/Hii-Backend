@@ -368,7 +368,7 @@ const createVendor = async (req, res) => {
 const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description, registration_number, tax_id, company_type, website } = req.body;
+    const { name, email, phone_number, city, state, address, landmark, password, vendor_type, contact_person, capacity, description, registration_number, tax_id, company_type, website, latitude, longitude } = req.body;
 
     console.log('🔄 Updating vendor:', id);
     console.log('📥 Request body:', req.body);
@@ -526,6 +526,19 @@ const updateVendor = async (req, res) => {
       hasChanges = true;
     }
 
+    // Location coordinates — from AccountSettings LocationPicker
+    const latNum = latitude !== undefined && latitude !== '' ? parseFloat(latitude) : undefined;
+    const lngNum = longitude !== undefined && longitude !== '' ? parseFloat(longitude) : undefined;
+    if (latNum !== undefined && !isNaN(latNum) && latNum !== vendor.latitude) {
+      updates.latitude = latNum;
+      changes.push('Location coordinates updated');
+      hasChanges = true;
+    }
+    if (lngNum !== undefined && !isNaN(lngNum) && lngNum !== vendor.longitude) {
+      updates.longitude = lngNum;
+      hasChanges = true;
+    }
+
     // Password update
     if (password) {
       updates.password = await bcrypt.hash(password, 12);
@@ -587,6 +600,22 @@ const updateVendor = async (req, res) => {
         console.log('📧 Update notification email sent to vendor:', updatedVendor.email);
       } catch (emailError) {
         console.error('❌ Failed to send update email:', emailError.message);
+      }
+    }
+
+    // Propagate lat/lng to the linked Venue so the mobile map pin stays in sync.
+    if (updates.latitude !== undefined || updates.longitude !== undefined) {
+      try {
+        const venueCoords = {};
+        if (updates.latitude  !== undefined) venueCoords.latitude  = updates.latitude;
+        if (updates.longitude !== undefined) venueCoords.longitude = updates.longitude;
+        await Venue.updateMany(
+          { vendor_id: updatedVendor._id, is_deleted: { $ne: true } },
+          { $set: venueCoords },
+          { runValidators: false }
+        );
+      } catch (venueErr) {
+        console.warn('[venue lat/lng sync]', venueErr.message);
       }
     }
 

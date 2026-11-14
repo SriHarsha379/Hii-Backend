@@ -169,6 +169,19 @@ const VendorSchema = new mongoose.Schema(
       default: false,
     },
 
+    // Venue coordinates — set via LocationPicker in AccountSettings.
+    // Also propagated to the linked Venue document on save so the
+    // mobile app map pin stays in sync.
+    latitude: {
+      type: Number,
+      default: null,
+    },
+
+    longitude: {
+      type: Number,
+      default: null,
+    },
+
     last_login: {
       type: Date,
     }
