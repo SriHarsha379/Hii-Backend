@@ -1340,7 +1340,27 @@ const claimVendor = async (req, res) => {
   }
 };
 
+// ISSUE 6 FIX: dedicated endpoint so CLUB_ADMIN/EVENT_ADMIN can check
+// their own vendor's verification status without fetching all vendors.
+// Called by ProtectedRoute in App.tsx on every route navigation.
+const getMyStatus = async (req, res) => {
+  try {
+    const admin = req.user;
+    if (!admin.organisation) {
+      return apiResponse.ok(res, null, "No organisation linked");
+    }
+    const vendor = await Vendor.findOne(
+      { name: admin.organisation, is_deleted: { $ne: true } },
+      { _id: 1, is_verified: 1, is_active: 1, name: 1 }
+    ).lean();
+    return apiResponse.ok(res, vendor || null, "Status fetched");
+  } catch (err) {
+    return apiResponse.serverError(res, messages.SERVER_ERROR, err.message);
+  }
+};
+
 export default {
+  getMyStatus,
   claimVendor,
   getAllVendors,
   getVendorById,

@@ -37,12 +37,15 @@ const forgetNewPasswordSchema = Joi.object({
         .messages({
             "string.empty": "token is required.",
         }),
+    // ISSUE 9 FIX: match frontend passwordPolicy.ts
     newPassword: Joi.string()
-        .min(6)
+        .min(8)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/)
         .required()
         .messages({
             "string.empty": "New password is required.",
-            "string.min": "Password must be at least 6 characters long."
+            "string.min": "Password must be at least 8 characters long.",
+            "string.pattern.base": "Password must contain an uppercase letter, a lowercase letter, and a number."
         }),
 });
 
@@ -62,10 +65,15 @@ const registerOrganiserSchema = Joi.object({
             "string.empty": "Email is required.",
             "string.email": "Please enter a valid email address."
         }),
-    password: Joi.string().min(6).required()
+    // ISSUE 9 FIX: match frontend passwordPolicy.ts (min 8, complexity)
+    password: Joi.string()
+        .min(8)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/)
+        .required()
         .messages({
             "string.empty": "Password is required.",
-            "string.min": "Password must be at least 6 characters long."
+            "string.min": "Password must be at least 8 characters long.",
+            "string.pattern.base": "Password must contain an uppercase letter, a lowercase letter, and a number."
         }),
     role: Joi.string().valid("CLUB_ADMIN", "EVENT_ADMIN").required()
         .messages({

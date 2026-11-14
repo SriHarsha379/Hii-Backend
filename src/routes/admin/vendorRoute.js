@@ -8,6 +8,11 @@ import upload from "../../config/multer_config.js";
 const route = express.Router();
 
 route
+  // ISSUE 6 FIX: lightweight self-status check for CLUB_ADMIN / EVENT_ADMIN.
+  // Returns just this admin's linked vendor (is_verified, is_active, _id).
+  // Replaces the previous pattern of fetching all vendors and filtering client-side.
+  .get("/my-status", adminauth, vendorController.getMyStatus)
+
   .get("/get_all_vendors", adminauth, vendorController.getAllVendors)
 
   .get("/get_vendor_by_id/:id", adminauth, vendorController.getVendorById)

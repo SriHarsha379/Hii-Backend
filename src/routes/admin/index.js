@@ -39,6 +39,7 @@ import adminManagementRoute from "./adminManagementRoute.js"
 import pollRoute from "./pollRoute.js"
 import contestRoute from "./contestRoute.js"
 import searchRoute from "./searchRoute.js"
+import aiRoute from "./aiRoute.js"  // ISSUE 3 FIX
 import userRolesRoute from "./userRolesRoute.js";
 
 
@@ -98,6 +99,7 @@ const routeArray = [
   { path: "/polls", route: pollRoute },
   { path: "/contests", route: contestRoute },
   { path: "/search", route: searchRoute },
+  { path: "/ai", route: aiRoute },  // ISSUE 3 FIX
   { path: "/user-roles", route: userRolesRoute },
 ];
 

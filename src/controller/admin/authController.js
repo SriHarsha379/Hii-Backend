@@ -61,6 +61,19 @@ const loginAdmin = async (req, res) => {
     // 4️⃣ Generate JWT
     const token = jwtt.generateToken(admin._id, "admin");
 
+    // ISSUE 13/27 FIX: include vendorId so the frontend can do
+    // ID-based vendor lookups instead of fragile name-string matching.
+    // Only relevant for CLUB_ADMIN / EVENT_ADMIN accounts that have
+    // completed onboarding (organisation is set).
+    let vendorId = null;
+    if (admin.organisation && (admin.role === 'CLUB_ADMIN' || admin.role === 'EVENT_ADMIN')) {
+      const linked = await Vendor.findOne(
+        { name: admin.organisation, is_deleted: { $ne: true } },
+        { _id: 1 }
+      ).lean();
+      if (linked) vendorId = linked._id;
+    }
+
 return apiResponse.ok(
   res,
   {
@@ -69,7 +82,8 @@ return apiResponse.ok(
     _id: admin._id,
     name: admin.name,
     role: admin.role,
-    organisation: admin.organisation
+    organisation: admin.organisation,
+    vendorId,
   },
   "Login successful"
 );
@@ -103,8 +117,13 @@ const registerOrganiser = async (req, res) => {
       return apiResponse.badRequest(res, "Role must be CLUB_ADMIN or EVENT_ADMIN");
     }
 
-    if (password.length < 6) {
-      return apiResponse.badRequest(res, "Password must be at least 6 characters");
+    // ISSUE 9 (partial) FIX: enforce same policy as frontend passwordPolicy.ts
+    const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
+    if (password.length < 8) {
+      return apiResponse.badRequest(res, "Password must be at least 8 characters");
+    }
+    if (!PASSWORD_REGEX.test(password)) {
+      return apiResponse.badRequest(res, "Password must contain an uppercase letter, a lowercase letter, and a number");
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -123,6 +142,9 @@ const registerOrganiser = async (req, res) => {
 
     const token = jwtt.generateToken(admin._id, "admin");
 
+    // ISSUE 13/27 FIX: vendorId is null at registration (no vendor yet —
+    // onboarding hasn't happened). Frontend ProtectedRoute will redirect to
+    // onboarding, which creates the vendor and updates organisation.
     return apiResponse.ok(
       res,
       {
@@ -132,6 +154,7 @@ const registerOrganiser = async (req, res) => {
         name: admin.name,
         role: admin.role,
         organisation: admin.organisation,
+        vendorId: null,
       },
       "Account created successfully"
     );
@@ -174,6 +197,15 @@ const verifyTwoFactorLogin = async (req, res) => {
     }
 
     const token = jwtt.generateToken(admin._id, "admin");
+    // ISSUE 13/27 FIX: include vendorId in 2FA login response too
+    let vendorId = null;
+    if (admin.organisation && (admin.role === 'CLUB_ADMIN' || admin.role === 'EVENT_ADMIN')) {
+      const linked = await Vendor.findOne(
+        { name: admin.organisation, is_deleted: { $ne: true } },
+        { _id: 1 }
+      ).lean();
+      if (linked) vendorId = linked._id;
+    }
     return apiResponse.ok(
       res,
       {
@@ -182,7 +214,8 @@ const verifyTwoFactorLogin = async (req, res) => {
         _id: admin._id,
         name: admin.name,
         role: admin.role,
-        organisation: admin.organisation
+        organisation: admin.organisation,
+        vendorId,
       },
       "Login successful"
     );
