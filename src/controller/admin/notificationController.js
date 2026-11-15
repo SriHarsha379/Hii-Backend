@@ -154,4 +154,20 @@ const getVendorUnreadCount = async (req, res) => {
     }
 };
 
-export default { sendVendorNotification, getVendorNotifications, getVendorUnreadCount };
+export default { sendVendorNotification, getVendorNotifications, getVendorUnreadCount, markAllNotificationsRead };
+// POST /notification/mark_all_read
+// Sets read_status = 1 on every notification for the logged-in admin/vendor.
+const markAllNotificationsRead = async (req, res) => {
+  try {
+    const recipientId = req.user?.id || req.vendor?._id;
+    if (!recipientId) return apiResponse.unauthorized(res, "Unauthorised");
+
+    await Notification.updateMany(
+      { recipient: recipientId, read_status: 0 },
+      { $set: { read_status: 1 } }
+    );
+    return apiResponse.ok(res, null, "All notifications marked as read");
+  } catch (err) {
+    return apiResponse.serverError(res, "Server error", err.message);
+  }
+};

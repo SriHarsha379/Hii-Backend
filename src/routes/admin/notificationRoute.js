@@ -8,5 +8,6 @@ route
   .post('/send_notification', allowAdminOrVendor, manageController.sendVendorNotification)
   .get('/all', allowAdminOrVendor, manageController.getVendorNotifications)
   .get('/unread_count', allowAdminOrVendor, manageController.getVendorUnreadCount)
+  .post('/mark_all_read', allowAdminOrVendor, manageController.markAllNotificationsRead)
 
-  export default route
+export default route
