@@ -154,7 +154,6 @@ const getVendorUnreadCount = async (req, res) => {
     }
 };
 
-export default { sendVendorNotification, getVendorNotifications, getVendorUnreadCount, markAllNotificationsRead };
 // POST /notification/mark_all_read
 // Sets read_status = 1 on every notification for the logged-in admin/vendor.
 const markAllNotificationsRead = async (req, res) => {
@@ -171,3 +170,5 @@ const markAllNotificationsRead = async (req, res) => {
     return apiResponse.serverError(res, "Server error", err.message);
   }
 };
+
+export default { sendVendorNotification, getVendorNotifications, getVendorUnreadCount, markAllNotificationsRead };
