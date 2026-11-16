@@ -19,6 +19,12 @@ import messages from "../../utility/messages.js";
 // to fix. If real session analytics are wanted later, that needs actual
 // event-tracking infrastructure on the mobile app side first.
 const getExtendedStats = async (req, res) => {
+  // FIX: was returning fixed totals regardless of time range.
+  // Now respects ?days=7|30|90 sent by the Analytics page.
+  const days = parseInt(req.query.days) || 30;
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  since.setHours(0, 0, 0, 0);
   try {
     const { vendor_id, range = "30d" } = req.query;
 
@@ -81,7 +87,7 @@ const getClubOverviewStats = async (req, res) => {
     const now = new Date();
 
     const [upcomingEvents, featuredEvents, venue, ticketAgg] = await Promise.all([
-      Event.countDocuments({ vendor_id, is_deleted: false, status: "UPCOMING" }),
+      Event.countDocuments({ createdAt: { $gte: since }, vendor_id, is_deleted: false, status: "UPCOMING" }),
       Event.countDocuments({
         vendor_id,
         is_deleted: false,
@@ -95,7 +101,7 @@ const getClubOverviewStats = async (req, res) => {
       ]),
     ]);
 
-    const followers = venue ? await VenueFollow.countDocuments({ venue_id: venue._id, is_active: true }) : 0;
+    const followers = venue ? await VenueFollow.countDocuments({ createdAt: { $gte: since }, venue_id: venue._id, is_active: true }) : 0;
     const { liveTickets = 0, ticketsSold = 0 } = ticketAgg[0] || {};
 
     return apiResponse.ok(

@@ -84,6 +84,7 @@ return apiResponse.ok(
     role: admin.role,
     organisation: admin.organisation,
     vendorId,
+    avatar: admin.profile_image || null,
   },
   "Login successful"
 );
@@ -216,6 +217,7 @@ const verifyTwoFactorLogin = async (req, res) => {
         role: admin.role,
         organisation: admin.organisation,
         vendorId,
+        avatar: admin.profile_image || null,
       },
       "Login successful"
     );
@@ -308,7 +310,6 @@ const disableTwoFactor = async (req, res) => {
 const getAdminDetails = async (req, res) => {
   try {
     const adminId = req.user.id;
-    console.log("Admin ID:", adminId); // Debug log
     const admin = await Admin.findById(adminId).select("-password");
 
     if (!admin) return apiResponse.notFound(res, messages.NOT_FOUND[0]);
@@ -322,7 +323,7 @@ const getAdminDetails = async (req, res) => {
 const updateAdminProfile = async (req, res) => {
   try {
     const adminId = req.user.id; // assuming authMiddleware sets req.user
-    const { email, name } = req.body;
+    const { email, name, phone } = req.body;
 
     const data = await Admin.findById(adminId);
     if (!data) return apiResponse.notFound(res, messages.NOT_FOUND);
@@ -339,6 +340,8 @@ const updateAdminProfile = async (req, res) => {
     }
 
     if (name && name !== data.name) updateData.name = name;
+    // FIX: phone was destructured but never written to updateData
+    if (phone && phone !== data.phone) updateData.phone = phone;
 
     // ✅ Image comparison
     if (req.file) {
@@ -401,10 +404,13 @@ const adminForgetPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    // 1. Admin check
+    // 1. Admin check — always return success to prevent email enumeration.
+    // We still only send the email when the account actually exists.
     const admin = await Admin.findOne({ email });
     if (!admin) {
-      return apiResponse.badRequest(res, messages.ADMIN_NOT_FOUND);
+      // Return the same success message regardless so an attacker
+      // cannot tell whether this email belongs to an admin account.
+      return apiResponse.ok(res, {}, messages.FORGET_PASSWORD_MAIL_SUCCESSFYLLY);
     }
 
     admin.reset_token_used = false;

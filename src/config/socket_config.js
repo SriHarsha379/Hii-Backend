@@ -158,30 +158,21 @@ function configureSocket(io) {
     });
 
 
-    socket.on('user_status', ({ user_id, check_user_id }) => {
+        socket.on('user_status', ({ user_id, check_user_id }) => {
       const activeUser = userManager.getActiveUserById(user_id);
-      const checked = userManager.getActiveUserById(check_user_id);
-      if (activeUser && checked) {
+      const checked    = userManager.getActiveUserById(check_user_id);
+      // FIX: the original else-branch re-checked the SAME condition
+      // that was just proven false, so "offline" was NEVER emitted.
+      // Now: if the requesting socket is online, always reply with
+      // the correct status of the user they asked about.
+      if (activeUser) {
+        const status = checked ? "online" : "offline";
         io.to(activeUser.socketId).emit("user_status", {
           userId: check_user_id,
-          // conversation_id: user.conversation_id,
-          status: "online"
+          status,
         });
       }
-      else {
-        if(activeUser && checked){
-       io.to(activeUser.socketId).emit("user_status", {
-          userId: check_user_id,
-          // conversation_id: user.conversation_id,
-          status: "offline"
-        });
-        }
-      
-      }
-
-
     })
-
     /* ✅ PRIVATE MESSAGE (FIXED – NOT GLOBAL) */
     socket.on("send_message", async (data) => {
       console.log('-------------send_message-', data);
@@ -437,7 +428,9 @@ function configureSocket(io) {
     });
   });
 
-  configureSocket.io = io;
+  // Use a getter instead of a bare property assignment so callers
+// always receive the live io reference, not a stale snapshot.
+configureSocket.getIO = () => io;
 }
 
 // chat  code 

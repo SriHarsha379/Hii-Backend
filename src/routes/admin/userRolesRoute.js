@@ -1,8 +1,26 @@
+/** @format */
 import express from "express";
-import userRolesController from "../../controller/admin/userRolesController.js";
-import { allowAdminOrVendor } from "../../middleware/authMiddleware.js";
+import { adminauth } from "../../middleware/authMiddleware.js";
 
 const route = express.Router();
-route.post("/batch", allowAdminOrVendor, userRolesController.getRolesBatch);
-route.get("/:id", allowAdminOrVendor, userRolesController.getRolesForUser);
+
+/**
+ * GET  /user-roles
+ * Returns all available admin role names.
+ * Extend with real CRUD role-management logic as the feature grows.
+ */
+route.get("/", adminauth, (req, res) => {
+  res.json({
+    success: true,
+    message: "User roles fetched successfully",
+    data: [
+      "SUPER_ADMIN",
+      "NORMAL_ADMIN",
+      "CLUB_ADMIN",
+      "EVENT_ADMIN",
+      "CITY_ADMIN",
+    ],
+  });
+});
+
 export default route;
