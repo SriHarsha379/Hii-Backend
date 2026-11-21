@@ -787,6 +787,17 @@ const deleteVendor = async (req, res) => {
       { new: true, runValidators: false }
     );
 
+    // Soft-delete linked venue so createVenue doesn't block on orphan check
+    try {
+      await Venue.findOneAndUpdate(
+        { vendor_id: id, is_deleted: false },
+        { is_deleted: true },
+        { runValidators: false }
+      );
+    } catch (ve) {
+      console.warn('[deleteVendor] venue soft-delete failed:', ve.message);
+    }
+
     console.log('✅ Vendor soft deleted:', {
       id: vendor._id,
       email: vendor.email,
