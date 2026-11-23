@@ -3,7 +3,7 @@ import helper from "../utility/helper.js"
 
 const VenueSchema = new mongoose.Schema(
   {
-    vendor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor", required: true },
+    vendor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor", required: false },
 
     venue_name: { type: String, required: true, trim: true },
     venue_image: { type: String, required: true },
