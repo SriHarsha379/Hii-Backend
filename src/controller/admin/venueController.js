@@ -34,10 +34,12 @@ const createVenue = async (req, res) => {
       }
     }
 
-    if (!vendorId) {
+    // ✅ Point 3 fix: Super Admin can create venue without vendor_id
+    // vendor_id is now optional for Super Admin — moved to Events flow
+    if (!vendorId && req.admin?.role !== 'admin') {
       return apiResponse.badRequest(
         res,
-        "vendor_id is required when creating a venue as an admin (select the club/organiser this venue belongs to)"
+        "vendor_id is required when creating a venue as an organiser"
       );
     }
 
