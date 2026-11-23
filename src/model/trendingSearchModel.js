@@ -17,7 +17,7 @@ const TrendingSearchSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["event", "venue"],
+      enum: ["event", "venue", "member"],  // ✅ FIX: added member support
       required: true
     }
   },
