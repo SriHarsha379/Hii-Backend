@@ -529,7 +529,7 @@ const updateEvent = async (req, res) => {
     /* ================= UPDATE ================= */
 
     const updatedEvent = await Event.findOneAndUpdate(
-      { _id: id, vendor_id: vendorId },
+      { _id: id },
       updateData,
       { new: true }
     );
