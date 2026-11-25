@@ -144,6 +144,7 @@ const createVenue = async (req, res) => {
     const finalBillDiscount = parseFloat(bill_discount_percentage || 0);
 
     /* ================= CREATE ================= */
+    const isSuperAdmin = req.user?.role === "SUPER_ADMIN" || req.user?.role === "NORMAL_ADMIN";
     const newVenue = await Venue.create({
       vendor_id: vendorId,
       venue_name,
@@ -165,7 +166,9 @@ const createVenue = async (req, res) => {
       reservation_fee: finalReservationFee,
       tax_percentage: finalTax,
       bill_discount_percentage: finalBillDiscount,
-      terms_and_conditions: parsedTerms
+      terms_and_conditions: parsedTerms,
+      is_verified: isSuperAdmin,
+      is_active: isSuperAdmin
     });
 
     return apiResponse.created(res, newVenue, "Venue created successfully");
