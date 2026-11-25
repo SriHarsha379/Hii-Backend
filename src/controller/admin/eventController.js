@@ -1,5 +1,5 @@
 /** @format */
-import { Event, Category, Vendor } from "../../model/index.js";
+import { Event, Category, Vendor, Venue } from "../../model/index.js";
 import apiResponse from "../../utility/apiResponse.js";
 import messages from "../../utility/messages.js";
 import { manageableVendorIds, ownershipFilter, isMainAdmin } from "../../utility/adminScope.js";
@@ -31,7 +31,10 @@ const createEvent = async (req, res) => {
     if (!req.vendor) {
       const vendorExists = await Vendor.findOne({ _id: vendorId, is_deleted: false });
       if (!vendorExists) {
-        return apiResponse.badRequest(res, "Selected club/organiser not found");
+        const venueExists = await Venue.findOne({ _id: vendorId, is_deleted: false });
+        if (!venueExists) {
+          return apiResponse.badRequest(res, "Selected club/organiser not found");
+        }
       }
     }
 
