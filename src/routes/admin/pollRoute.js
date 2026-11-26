@@ -9,6 +9,7 @@ const route = express.Router();
 route.get("/", adminauth, pollController.getAllPolls);
 route.post("/", adminauth, pollController.createPoll);
 route.patch("/:id/status", adminauth, pollController.updatePollStatus);
+route.put("/:id", adminauth, pollController.updatePoll);
 route.delete("/:id", adminauth, pollController.deletePoll);
 
 export default route;

@@ -80,4 +80,22 @@ const deletePoll = async (req, res) => {
   }
 };
 
-export default { getAllPolls, createPoll, updatePollStatus, deletePoll };
+const updatePoll = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, city, end_date, options } = req.body;
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (city !== undefined) updateData.city = city;
+    if (end_date !== undefined) updateData.end_date = new Date(end_date);
+    if (options !== undefined) updateData.options = options;
+    const Poll = (await import('../../model/index.js')).Poll;
+    const updated = await Poll.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updated) return apiResponse.notFoundResponse(res, 'Poll not found');
+    return apiResponse.ok(res, updated, 'Poll updated successfully');
+  } catch (error) {
+    return apiResponse.serverError(res, 'Server error', error.message);
+  }
+};
+
+export default { getAllPolls, createPoll, updatePoll, updatePollStatus, deletePoll };
