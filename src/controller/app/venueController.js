@@ -61,8 +61,12 @@ const getVenueDetail = async (req, res) => {
         const today = new Date().toLocaleDateString("en-CA", { timeZone: process.env.TZ || "Asia/Kolkata" }); // India date, not UTC
 
         /* ===== UPCOMING EVENTS AT VENUE ===== */
+        // ✅ Point 18 fix — search by vendor_id OR venue._id for orphan venues
+        const vendorQuery = venue.vendor_id
+            ? { $or: [{ vendor_id: venue.vendor_id }, { vendor_id: venue._id }] }
+            : { vendor_id: venue._id };
         const upcomingEvents = await Event.find({
-            vendor_id: venue.vendor_id,
+            ...vendorQuery,
             is_deleted: false,
             is_active: true,
             end_date: { $gte: today }
