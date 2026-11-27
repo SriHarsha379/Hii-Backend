@@ -70,6 +70,17 @@ const createVenue = async (req, res) => {
       capacity
     } = req.body;
 
+    // ✅ Point 1 — Check for duplicate venue by name + address
+    if (venue_name && address) {
+      const duplicate = await Venue.findOne({
+        venue_name: { $regex: new RegExp(`^${venue_name.trim()}$`, 'i') },
+        address: { $regex: new RegExp(address.trim().substring(0, 20), 'i') },
+      });
+      if (duplicate) {
+        return apiResponse.badRequest(res, `A venue named "${venue_name}" already exists at this location.`);
+      }
+    }
+
     /* ================= TIME NORMALIZER ================= */
     const normalizeTime = (timeStr) => {
       if (!timeStr) return "";

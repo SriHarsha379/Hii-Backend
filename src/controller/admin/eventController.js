@@ -96,6 +96,19 @@ const createEvent = async (req, res) => {
       return apiResponse.badRequest(res, "Please fill all required fields");
     }
 
+    // ✅ Point 1 — Check for duplicate event by name + date + address
+    if (venue_name && start_date && address) {
+      const duplicate = await Event.findOne({
+        venue_name: { $regex: new RegExp(`^${venue_name.trim()}$`, 'i') },
+        start_date: start_date,
+        address: { $regex: new RegExp(address.trim().substring(0, 20), 'i') },
+        is_deleted: false,
+      });
+      if (duplicate) {
+        return apiResponse.badRequest(res, `An event named "${venue_name}" already exists on this date at this location.`);
+      }
+    }
+
     /* ================= CATEGORY PARSE ================= */
 
     let parsedCategoryIds = [];
