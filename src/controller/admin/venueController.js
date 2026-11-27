@@ -66,7 +66,8 @@ const createVenue = async (req, res) => {
       tax_percentage,
       bill_discount_percentage,
       open_days,
-      terms_and_conditions
+      terms_and_conditions,
+      capacity
     } = req.body;
 
     /* ================= TIME NORMALIZER ================= */
@@ -167,6 +168,7 @@ const createVenue = async (req, res) => {
       tax_percentage: finalTax,
       bill_discount_percentage: finalBillDiscount,
       terms_and_conditions: parsedTerms,
+      capacity: capacity ? parseInt(capacity) : null,
       is_verified: isSuperAdmin,
       is_active: isSuperAdmin
     });
@@ -202,6 +204,7 @@ const updateVenue = async (req, res) => {
       venue_image: venue_image_from_body,
       gallery_images: gallery_images_from_body,
       existing_gallery_images,
+      capacity,
       terms_and_conditions
     } = req.body;
 
@@ -305,6 +308,7 @@ const updateVenue = async (req, res) => {
 
       address: address || venueExists.address,
       about: about || venueExists.about,
+      capacity: capacity !== undefined ? (capacity ? parseInt(capacity) : null) : venueExists.capacity,
       latitude: latitude ? parseFloat(latitude) : venueExists.latitude,
       longitude: longitude ? parseFloat(longitude) : venueExists.longitude,
       table_reservation_fee: parseFloat(table_reservation_fee || venueExists.table_reservation_fee || 0),
