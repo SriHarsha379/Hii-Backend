@@ -336,7 +336,16 @@ const updateEvent = async (req, res) => {
     if (address !== undefined) updateData.address = address;
     if (about !== undefined) updateData.about = about;
     if (ticketing_link !== undefined) updateData.ticketing_link = ticketing_link;
-    if (genre !== undefined) updateData.genre = Array.isArray(genre) ? genre : (genre ? JSON.parse(genre) : []);
+    if (genre !== undefined) {
+      try {
+        const rawGenre = Array.isArray(genre) ? genre : JSON.parse(genre);
+        const flatten = (arr) => arr.flatMap(g => {
+          if (typeof g === 'string' && g.startsWith('[')) { try { return flatten(JSON.parse(g)); } catch(e) { return []; } }
+          return typeof g === 'string' && g ? [g] : [];
+        });
+        updateData.genre = [...new Set(flatten(rawGenre))];
+      } catch(e) { updateData.genre = []; }
+    }
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
     if (terms_and_conditions !== undefined)
