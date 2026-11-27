@@ -506,6 +506,22 @@ const getFeaturedVenues = async (req, res) => {
   }
 };
 
+const activateVenue = async (req, res) => {
+  try {
+    const venue = await Venue.findByIdAndUpdate(req.params.id, { is_active: true }, { new: true });
+    if (!venue) return apiResponse.notFoundResponse(res, 'Venue not found');
+    return apiResponse.ok(res, venue, 'Venue activated');
+  } catch (e) { return apiResponse.serverError(res, 'Server error', e.message); }
+};
+
+const deactivateVenue = async (req, res) => {
+  try {
+    const venue = await Venue.findByIdAndUpdate(req.params.id, { is_active: false }, { new: true });
+    if (!venue) return apiResponse.notFoundResponse(res, 'Venue not found');
+    return apiResponse.ok(res, venue, 'Venue deactivated');
+  } catch (e) { return apiResponse.serverError(res, 'Server error', e.message); }
+};
+
 export default {
   createVenue,
   getAllVenues,

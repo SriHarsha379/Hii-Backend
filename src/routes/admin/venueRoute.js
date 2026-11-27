@@ -44,4 +44,7 @@ route.get("/featured", allowAdminOrVendor, venueController.getFeaturedVenues);
 route.post("/feature/:id", allowAdminOrVendor, venueController.featureVenue);
 route.post("/unfeature/:id", allowAdminOrVendor, venueController.unfeatureVenue);
 
+route.put("/activate_venue/:id", adminauth, venueController.activateVenue);
+route.put("/deactivate_venue/:id", adminauth, venueController.deactivateVenue);
+
 export default route;
