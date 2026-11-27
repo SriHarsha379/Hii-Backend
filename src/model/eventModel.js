@@ -30,6 +30,7 @@ const EventSchema = new mongoose.Schema(
     is_multi_day: { type: Boolean, default: false },
     about: { type: String, default: "" },
   ticketing_link: { type: String, default: "" },
+  genre: [{ type: String }],
 
     gallery_images: [{ type: String, required: true }],
 

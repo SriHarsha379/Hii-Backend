@@ -263,6 +263,7 @@ const createEvent = async (req, res) => {
       is_multi_day: is_multi_day === "true" || is_multi_day === true,
       about: about || "",
       ticketing_link: ticketing_link || "",
+      genre: genre ? (Array.isArray(genre) ? genre : JSON.parse(genre)) : [],
       gallery_images,
       artists: parsedArtists,
 
@@ -316,7 +317,8 @@ const updateEvent = async (req, res) => {
       terms_and_conditions,
       existing_gallery_images,
       existing_event_layout_images,
-      ticketing_link
+      ticketing_link,
+      genre
     } = req.body;
 
     if (!eventExists) {
@@ -332,6 +334,7 @@ const updateEvent = async (req, res) => {
     if (address !== undefined) updateData.address = address;
     if (about !== undefined) updateData.about = about;
     if (ticketing_link !== undefined) updateData.ticketing_link = ticketing_link;
+    if (genre !== undefined) updateData.genre = Array.isArray(genre) ? genre : (genre ? JSON.parse(genre) : []);
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
     if (terms_and_conditions !== undefined)
