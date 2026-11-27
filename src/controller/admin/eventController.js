@@ -315,7 +315,8 @@ const updateEvent = async (req, res) => {
       prohibited_items,
       terms_and_conditions,
       existing_gallery_images,
-      existing_event_layout_images
+      existing_event_layout_images,
+      ticketing_link
     } = req.body;
 
     if (!eventExists) {
