@@ -54,7 +54,9 @@ const createEvent = async (req, res) => {
       longitude,
       faqs,
       prohibited_items,
-      terms_and_conditions
+      terms_and_conditions,
+      ticketing_link,
+      genre
     } = req.body;
 
     /* ================= FILE UPLOADS ================= */
