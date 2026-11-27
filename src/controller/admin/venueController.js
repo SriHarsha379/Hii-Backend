@@ -543,4 +543,6 @@ export default {
   featureVenue,
   unfeatureVenue,
   getFeaturedVenues,
+  activateVenue,
+  deactivateVenue,
 };
