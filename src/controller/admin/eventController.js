@@ -262,6 +262,7 @@ const createEvent = async (req, res) => {
       end_date: finalEndDate,
       is_multi_day: is_multi_day === "true" || is_multi_day === true,
       about: about || "",
+      ticketing_link: ticketing_link || "",
       gallery_images,
       artists: parsedArtists,
 
@@ -329,6 +330,7 @@ const updateEvent = async (req, res) => {
     if (city_id !== undefined) updateData.city_id = city_id;
     if (address !== undefined) updateData.address = address;
     if (about !== undefined) updateData.about = about;
+    if (ticketing_link !== undefined) updateData.ticketing_link = ticketing_link;
     if (latitude !== undefined) updateData.latitude = latitude;
     if (longitude !== undefined) updateData.longitude = longitude;
     if (terms_and_conditions !== undefined)
