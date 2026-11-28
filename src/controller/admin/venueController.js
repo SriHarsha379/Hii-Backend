@@ -379,7 +379,7 @@ const getAllVenues = async (req, res) => {
     const query = { is_deleted: false };
     if (vendorId) query.vendor_id = vendorId;
 
-    const venues = await Venue.find(query).populate("category_ids", "category_name");
+    const venues = await Venue.find(query).populate("category_ids", "category_name").populate("city_id", "city_name");
 
     return apiResponse.ok(res, venues, "Success");
   } catch (error) {
