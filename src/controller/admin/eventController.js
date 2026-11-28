@@ -598,6 +598,7 @@ const getAllEvents = async (req, res) => {
 
     const events = await Event.find(query)
       .populate("category_ids", "category_name")
+      .populate("city_id", "city_name")
       .sort({ createdAt: -1 });
 
     return apiResponse.ok(res, events, "Success");
