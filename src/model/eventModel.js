@@ -31,6 +31,9 @@ const EventSchema = new mongoose.Schema(
     about: { type: String, default: "" },
   ticketing_link: { type: String, default: "" },
   genre: [{ type: String }],
+  is_recurring: { type: Boolean, default: false },
+  recurrence_frequency: { type: String, default: 'weekly' },
+  recurrence_days: [{ type: String }],
 
     gallery_images: [{ type: String, required: true }],
 

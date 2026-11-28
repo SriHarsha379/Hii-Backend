@@ -56,7 +56,10 @@ const createEvent = async (req, res) => {
       prohibited_items,
       terms_and_conditions,
       ticketing_link,
-      genre
+      genre,
+      is_recurring,
+      recurrence_frequency,
+      recurrence_days
     } = req.body;
 
     /* ================= FILE UPLOADS ================= */
@@ -266,6 +269,9 @@ const createEvent = async (req, res) => {
       about: about || "",
       ticketing_link: ticketing_link || "",
       genre: genre ? (Array.isArray(genre) ? genre : JSON.parse(genre)) : [],
+      is_recurring: is_recurring === 'true' || is_recurring === true,
+      recurrence_frequency: recurrence_frequency || 'weekly',
+      recurrence_days: recurrence_days ? (Array.isArray(recurrence_days) ? recurrence_days : JSON.parse(recurrence_days)) : [],
       gallery_images,
       artists: parsedArtists,
 
@@ -320,7 +326,10 @@ const updateEvent = async (req, res) => {
       existing_gallery_images,
       existing_event_layout_images,
       ticketing_link,
-      genre
+      genre,
+      is_recurring,
+      recurrence_frequency,
+      recurrence_days
     } = req.body;
 
     if (!eventExists) {
@@ -336,6 +345,9 @@ const updateEvent = async (req, res) => {
     if (address !== undefined) updateData.address = address;
     if (about !== undefined) updateData.about = about;
     if (ticketing_link !== undefined) updateData.ticketing_link = ticketing_link;
+    if (is_recurring !== undefined) updateData.is_recurring = is_recurring === 'true' || is_recurring === true;
+    if (recurrence_frequency !== undefined) updateData.recurrence_frequency = recurrence_frequency;
+    if (recurrence_days !== undefined) updateData.recurrence_days = Array.isArray(recurrence_days) ? recurrence_days : (recurrence_days ? JSON.parse(recurrence_days) : []);
     if (genre !== undefined) {
       try {
         const rawGenre = Array.isArray(genre) ? genre : JSON.parse(genre);
