@@ -43,12 +43,15 @@ const createVenue = async (req, res) => {
       );
     }
 
-    const existingVenue = await checkVendorVenueExists(vendorId);
-    if (existingVenue) {
-      return apiResponse.badRequest(
-        res,
-        "You already have a venue. Please update or delete your existing venue first."
-      );
+    // ✅ Only check for existing venue when vendorId is set (vendors only, not Super Admin)
+    if (vendorId) {
+      const existingVenue = await checkVendorVenueExists(vendorId);
+      if (existingVenue) {
+        return apiResponse.badRequest(
+          res,
+          "You already have a venue. Please update or delete your existing venue first."
+        );
+      }
     }
 
     const {
