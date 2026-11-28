@@ -531,10 +531,11 @@ const updateEvent = async (req, res) => {
 
     const MAX_GALLERY_IMAGES = 10;
 
-    const existingGallery =
-      existing_gallery_images
-        ? JSON.parse(existing_gallery_images)
-        : eventExists.gallery_images || [];
+    // ✅ Fix: when existing_gallery_images is explicitly sent (even empty), use it
+    // This allows deleting gallery images by sending an empty array
+    const existingGallery = existing_gallery_images !== undefined
+      ? (existing_gallery_images ? JSON.parse(existing_gallery_images) : [])
+      : (eventExists.gallery_images || []);
 
     const newGallery =
       req.files?.gallery_images?.map((f) => f.filename) || [];
